@@ -2,7 +2,7 @@
 
 > **A working ZTNA policy engine with real Okta SSO integration** — sign in with your actual Okta identity, watch your real groups and MFA method populate the identity panel, then evaluate access decisions against live IdP data.
 
-Live: **[ishwaryaunfiltered.live/ztna-simulator](https://ishwaryaunfiltered.live/ztna-simulator)**  
+Live: **[ishwaryaaunfiltered.live/ztna-simulator](https://ishwaryaaunfiltered.live/ztna-simulator)**  
 Built by [Ishwarya Lakshmi C](https://github.com/IshwaryaLakshmiC)
 
 ---
@@ -45,9 +45,9 @@ Applications → Create App Integration → **OIDC** → **Single Page App**
 
 Settings:
 - **App name:** ZTNA Simulator
-- **Sign-in redirect URI:** `https://ishwaryaunfiltered.live/ztna-simulator`  
+- **Sign-in redirect URI:** `https://ishwaryaaunfiltered.live/ztna-simulator`  
   Also add: `http://localhost:8080` (for local testing)
-- **Sign-out redirect URI:** `https://ishwaryaunfiltered.live/ztna-simulator`
+- **Sign-out redirect URI:** `https://ishwaryaaunfiltered.live/ztna-simulator`
 - **Controlled access:** Allow everyone (or assign specific groups)
 
 Note your **Client ID**.
@@ -129,4 +129,4 @@ For Okta to work locally, add `http://localhost:8080` as a redirect URI in your 
 ---
 
 **Ishwarya Lakshmi C** — Senior DevOps & Cloud Security Engineer  
-[Website](https://ishwaryaunfiltered.live) · [LinkedIn](https://linkedin.com/in/ishwaryachengalvarayan) · [GitHub](https://github.com/IshwaryaLakshmiC)
+[Website](https://ishwaryaaunfiltered.live) · [LinkedIn](https://linkedin.com/in/ishwaryachengalvarayan) · [GitHub](https://github.com/IshwaryaLakshmiC)
