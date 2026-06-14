@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Zero Trust Access Simulator — ishwaryaunfiltered.live</title>
+  <title>Zero Trust Access Simulator — ishwaryaaunfiltered.live</title>
   <meta name="description" content="Interactive ZTNA policy simulator with real Okta SSO integration. Live identity, device posture, and resource policy evaluation." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
@@ -188,10 +188,10 @@
 <body>
 
 <nav>
-  <a href="https://ishwaryaunfiltered.live" class="nav-brand">ishwarya@unfiltered:~$</a>
+  <a href="https://ishwaryaaunfiltered.live" class="nav-brand">ishwarya@unfiltered:~$</a>
   <div class="nav-right">
     <div class="nav-links">
-      <a href="https://ishwaryaunfiltered.live">Portfolio</a>
+      <a href="https://ishwaryaaunfiltered.live">Portfolio</a>
       <a href="https://github.com/IshwaryaLakshmiC/ztna-simulator" target="_blank">GitHub</a>
     </div>
     <div id="nav-auth-area"></div>
@@ -392,7 +392,7 @@
 </div>
 
 <footer>
-  Zero Trust Access Simulator · <a href="https://ishwaryaunfiltered.live">ishwaryaunfiltered.live</a> ·
+  Zero Trust Access Simulator · <a href="https://ishwaryaaunfiltered.live">ishwaryaaunfiltered.live</a> ·
   <a href="https://github.com/IshwaryaLakshmiC/ztna-simulator" target="_blank">GitHub</a> ·
   Built by <a href="https://linkedin.com/in/ishwaryachengalvarayan">Ishwarya Lakshmi C</a>
 </footer>
@@ -912,7 +912,7 @@ Explain WHY and what should happen next. Be direct, no preamble.`;
   try {
     const res=await fetch('https://openrouter.ai/api/v1/chat/completions',{
       method:'POST',
-      headers:{'Authorization':`Bearer ${state.orKey}`,'Content-Type':'application/json','HTTP-Referer':'https://ishwaryaunfiltered.live','X-Title':'ZTNA Simulator'},
+      headers:{'Authorization':`Bearer ${state.orKey}`,'Content-Type':'application/json','HTTP-Referer':'https://ishwaryaaunfiltered.live','X-Title':'ZTNA Simulator'},
       body:JSON.stringify({model:'mistralai/mistral-7b-instruct:free',max_tokens:150,temperature:0.3,messages:[{role:'user',content:prompt}]})
     });
     const data=await res.json();
