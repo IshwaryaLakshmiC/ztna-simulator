@@ -4,229 +4,254 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Zero Trust Access Simulator — ishwaryaunfiltered.live</title>
-  <meta name="description" content="Interactive Zero Trust Network Access policy simulator. Real-time identity, device, and resource policy evaluation with AI-powered decision explanations." />
+  <meta name="description" content="Interactive ZTNA policy simulator with real Okta SSO integration. Live identity, device posture, and resource policy evaluation." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <!-- Okta Auth JS SDK -->
+  <script src="https://global.oktacdn.com/okta-auth-js/7.5.1/okta-auth-js.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg:       #0A0F1E;
-      --card:     #0D1B36;
-      --surface:  #112044;
-      --blue:     #3B82F6;
-      --blue-d:   #1E3A5F;
-      --green:    #10B981;
-      --amber:    #F59E0B;
-      --red:      #EF4444;
-      --purple:   #A78BFA;
-      --white:    #E2F0FF;
-      --slate:    #64748B;
-      --slate-l:  #94A3B8;
-      --mono:     'JetBrains Mono', monospace;
-      --sans:     'Inter', sans-serif;
-      --r:        8px;
+      --bg:#0A0F1E; --card:#0D1B36; --surface:#112044;
+      --blue:#3B82F6; --blue-d:#1E3A5F;
+      --green:#10B981; --amber:#F59E0B; --red:#EF4444; --purple:#A78BFA;
+      --white:#E2F0FF; --slate:#64748B; --slate-l:#94A3B8;
+      --mono:'JetBrains Mono',monospace; --sans:'Inter',sans-serif; --r:8px;
     }
-    html { scroll-behavior: smooth; }
-    body { background: var(--bg); color: var(--white); font-family: var(--sans); font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+    body { background:var(--bg); color:var(--white); font-family:var(--sans); font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased; min-height:100vh; }
 
     /* NAV */
-    nav { display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; border-bottom: 1px solid rgba(59,130,246,0.1); flex-wrap: wrap; gap: 10px; }
-    .nav-brand { font-family: var(--mono); font-size: 13px; color: var(--blue); font-weight: 600; text-decoration: none; }
-    .nav-title { font-size: 13px; color: var(--slate-l); }
-    .nav-links { display: flex; gap: 12px; }
-    .nav-links a { font-size: 12px; color: var(--slate); text-decoration: none; transition: color 0.2s; }
-    .nav-links a:hover { color: var(--white); }
+    nav { display:flex; align-items:center; justify-content:space-between; padding:1rem 2rem; border-bottom:1px solid rgba(59,130,246,0.1); flex-wrap:wrap; gap:10px; }
+    .nav-brand { font-family:var(--mono); font-size:13px; color:var(--blue); font-weight:600; text-decoration:none; }
+    .nav-right { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+    .nav-links { display:flex; gap:12px; }
+    .nav-links a { font-size:12px; color:var(--slate); text-decoration:none; transition:color 0.2s; }
+    .nav-links a:hover { color:var(--white); }
 
-    /* LAYOUT */
-    .page { max-width: 1200px; margin: 0 auto; padding: 2rem; display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; }
-    @media (max-width: 900px) { .page { grid-template-columns: 1fr; } }
+    /* OKTA STATUS BAR */
+    .okta-bar { max-width:1200px; margin:1rem auto; padding:0 2rem; }
+    .okta-config-panel { background:var(--card); border:1px solid rgba(59,130,246,0.15); border-radius:var(--r); padding:16px 20px; }
+    .okta-config-title { font-family:var(--mono); font-size:11px; color:var(--blue); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:12px; }
+    .okta-config-grid { display:grid; grid-template-columns:1fr 1fr auto; gap:10px; align-items:end; }
+    @media(max-width:640px) { .okta-config-grid { grid-template-columns:1fr; } }
+    .cfg-group { display:flex; flex-direction:column; gap:4px; }
+    .cfg-label { font-size:11px; color:var(--slate); font-family:var(--mono); }
+    .cfg-input { background:var(--surface); border:1px solid rgba(59,130,246,0.15); border-radius:6px; padding:8px 10px; font-size:12px; font-family:var(--mono); color:var(--white); outline:none; width:100%; }
+    .cfg-input:focus { border-color:var(--blue); }
+    .cfg-input::placeholder { color:var(--slate); }
+    .btn { padding:8px 18px; border-radius:6px; border:none; font-size:13px; font-weight:500; font-family:var(--sans); cursor:pointer; transition:all 0.15s; }
+    .btn-primary { background:var(--blue); color:#fff; }
+    .btn-primary:hover { background:#2563EB; }
+    .btn-ghost { background:transparent; color:var(--slate-l); border:1px solid rgba(100,116,139,0.3); }
+    .btn-ghost:hover { color:var(--white); border-color:var(--blue); }
+    .btn-danger { background:rgba(239,68,68,0.15); color:#FCA5A5; border:1px solid rgba(239,68,68,0.2); }
+    .btn-danger:hover { background:rgba(239,68,68,0.25); }
+    .okta-note { font-size:11px; color:var(--slate); margin-top:8px; }
+    .okta-note a { color:var(--blue); text-decoration:none; }
 
-    /* PANEL BASE */
-    .panel { background: var(--card); border: 1px solid rgba(59,130,246,0.1); border-radius: var(--r); overflow: hidden; }
-    .panel-header { padding: 12px 16px; border-bottom: 1px solid rgba(59,130,246,0.08); display: flex; align-items: center; justify-content: space-between; }
-    .panel-title { font-family: var(--mono); font-size: 11px; color: var(--blue); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
-    .panel-body { padding: 16px; }
+    /* IDENTITY BADGE */
+    .identity-badge { background:var(--card); border:1px solid rgba(16,185,129,0.25); border-radius:var(--r); padding:12px 16px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+    .id-avatar { width:36px; height:36px; border-radius:50%; background:rgba(59,130,246,0.2); display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:600; color:var(--blue); font-family:var(--mono); flex-shrink:0; }
+    .id-info { flex:1; }
+    .id-name { font-size:14px; font-weight:500; color:var(--white); }
+    .id-email { font-size:12px; color:var(--slate-l); font-family:var(--mono); }
+    .id-groups { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+    .id-group-tag { font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:4px; background:rgba(59,130,246,0.1); color:#93C5FD; border:1px solid rgba(59,130,246,0.2); }
+    .id-source { font-family:var(--mono); font-size:10px; padding:2px 8px; border-radius:4px; background:rgba(16,185,129,0.1); color:#6EE7B7; border:1px solid rgba(16,185,129,0.2); }
+    .id-actions { display:flex; gap:8px; align-items:center; }
 
-    /* SCENARIO CHIPS */
-    .scenario-chip { width: 100%; text-align: left; background: transparent; border: 1px solid rgba(59,130,246,0.1); border-radius: 6px; padding: 10px 12px; margin-bottom: 6px; cursor: pointer; transition: all 0.15s; color: var(--slate-l); font-family: var(--sans); font-size: 13px; display: flex; align-items: flex-start; gap: 10px; }
-    .scenario-chip:hover { border-color: rgba(59,130,246,0.35); color: var(--white); background: rgba(59,130,246,0.04); }
-    .scenario-chip.active { border-color: var(--blue); background: rgba(59,130,246,0.08); color: var(--white); }
-    .scenario-chip.active .chip-icon { opacity: 1; }
-    .chip-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; opacity: 0.7; }
-    .chip-label { font-size: 12px; font-weight: 500; color: inherit; line-height: 1.3; }
-    .chip-sub { font-size: 11px; color: var(--slate); margin-top: 2px; line-height: 1.3; }
-    .chip-badge { font-family: var(--mono); font-size: 9px; padding: 1px 5px; border-radius: 3px; margin-top: 4px; display: inline-block; }
-    .badge-attack { background: rgba(239,68,68,0.15); color: #FCA5A5; }
-    .badge-legit { background: rgba(16,185,129,0.15); color: #6EE7B7; }
-    .badge-edge { background: rgba(245,158,11,0.15); color: #FCD34D; }
+    /* OR DIVIDER */
+    .or-row { display:flex; align-items:center; gap:10px; margin:10px 0; }
+    .or-line { flex:1; height:1px; background:rgba(59,130,246,0.08); }
+    .or-text { font-size:11px; color:var(--slate); font-family:var(--mono); }
 
-    /* RIGHT PANEL */
-    .right-col { display: flex; flex-direction: column; gap: 1.5rem; }
+    /* MAIN LAYOUT */
+    .page { max-width:1200px; margin:0 auto; padding:1.5rem 2rem; display:grid; grid-template-columns:300px 1fr; gap:1.5rem; }
+    @media(max-width:900px) { .page { grid-template-columns:1fr; } }
 
-    /* IDENTITY CARD */
-    .attr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .attr-group { display: flex; flex-direction: column; gap: 4px; }
-    .attr-label { font-size: 11px; color: var(--slate); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; }
-    .attr-select, .attr-input {
-      background: var(--surface); border: 1px solid rgba(59,130,246,0.15);
-      border-radius: 6px; padding: 7px 10px; font-size: 13px; color: var(--white);
-      font-family: var(--sans); outline: none; width: 100%; transition: border-color 0.15s;
-      appearance: none;
-    }
-    .attr-select:focus, .attr-input:focus { border-color: var(--blue); }
-    .risk-bar-wrap { margin-top: 4px; }
-    .risk-bar { height: 4px; background: rgba(59,130,246,0.1); border-radius: 2px; overflow: hidden; }
-    .risk-fill { height: 100%; border-radius: 2px; transition: width 0.4s, background 0.4s; }
-    .risk-label { font-size: 11px; color: var(--slate-l); margin-top: 3px; font-family: var(--mono); }
+    /* PANELS */
+    .panel { background:var(--card); border:1px solid rgba(59,130,246,0.1); border-radius:var(--r); overflow:hidden; }
+    .panel-header { padding:10px 16px; border-bottom:1px solid rgba(59,130,246,0.08); display:flex; align-items:center; justify-content:space-between; }
+    .panel-title { font-family:var(--mono); font-size:11px; color:var(--blue); text-transform:uppercase; letter-spacing:0.1em; font-weight:600; }
+    .panel-body { padding:14px 16px; }
 
-    /* RESOURCE CARD */
-    .resource-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .resource-btn { background: var(--surface); border: 1px solid rgba(59,130,246,0.12); border-radius: var(--r); padding: 10px; cursor: pointer; transition: all 0.15s; text-align: center; }
-    .resource-btn:hover { border-color: rgba(59,130,246,0.35); }
-    .resource-btn.selected { border-color: var(--blue); background: rgba(59,130,246,0.08); }
-    .resource-icon { font-size: 20px; margin-bottom: 4px; }
-    .resource-name { font-size: 12px; font-weight: 500; color: var(--white); }
-    .resource-sensitivity { font-size: 10px; font-family: var(--mono); margin-top: 2px; }
-    .sens-critical { color: #FCA5A5; }
-    .sens-high { color: #FCD34D; }
-    .sens-low { color: #6EE7B7; }
+    /* SCENARIOS */
+    .scenario-chip { width:100%; text-align:left; background:transparent; border:1px solid rgba(59,130,246,0.1); border-radius:6px; padding:9px 12px; margin-bottom:5px; cursor:pointer; transition:all 0.15s; color:var(--slate-l); font-family:var(--sans); font-size:13px; display:flex; align-items:flex-start; gap:10px; }
+    .scenario-chip:hover { border-color:rgba(59,130,246,0.35); color:var(--white); background:rgba(59,130,246,0.04); }
+    .scenario-chip.active { border-color:var(--blue); background:rgba(59,130,246,0.08); color:var(--white); }
+    .chip-icon { font-size:15px; flex-shrink:0; margin-top:1px; }
+    .chip-label { font-size:12px; font-weight:500; line-height:1.3; }
+    .chip-sub { font-size:11px; color:var(--slate); margin-top:1px; line-height:1.3; }
+    .chip-badge { font-family:var(--mono); font-size:9px; padding:1px 5px; border-radius:3px; margin-top:3px; display:inline-block; }
+    .badge-attack { background:rgba(239,68,68,0.15); color:#FCA5A5; }
+    .badge-legit { background:rgba(16,185,129,0.15); color:#6EE7B7; }
+    .badge-edge { background:rgba(245,158,11,0.15); color:#FCD34D; }
 
-    /* POLICY RULES */
-    .policy-list { display: flex; flex-direction: column; gap: 6px; }
-    .policy-rule { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; background: var(--surface); border: 1px solid rgba(59,130,246,0.08); }
-    .rule-toggle { width: 32px; height: 18px; border-radius: 9px; cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0; border: none; }
-    .rule-toggle.on { background: var(--blue); }
-    .rule-toggle.off { background: var(--slate); }
-    .rule-toggle::after { content: ''; position: absolute; width: 12px; height: 12px; border-radius: 50%; background: white; top: 3px; transition: left 0.2s; }
-    .rule-toggle.on::after { left: 17px; }
-    .rule-toggle.off::after { left: 3px; }
-    .rule-text { font-size: 12px; color: var(--slate-l); flex: 1; }
-    .rule-text strong { color: var(--white); font-weight: 500; }
+    /* ATTRS */
+    .right-col { display:flex; flex-direction:column; gap:1.25rem; }
+    .attr-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .attr-group { display:flex; flex-direction:column; gap:4px; }
+    .attr-label { font-size:11px; color:var(--slate); font-family:var(--mono); text-transform:uppercase; letter-spacing:0.05em; }
+    .attr-select, .attr-input { background:var(--surface); border:1px solid rgba(59,130,246,0.15); border-radius:6px; padding:7px 10px; font-size:13px; color:var(--white); font-family:var(--sans); outline:none; width:100%; transition:border-color 0.15s; appearance:none; }
+    .attr-select:focus, .attr-input:focus { border-color:var(--blue); }
+    .attr-select.okta-locked { border-color:rgba(16,185,129,0.3); background:rgba(16,185,129,0.04); }
+    .okta-lock-badge { font-size:10px; color:#6EE7B7; font-family:var(--mono); margin-top:2px; }
+    .risk-bar { height:4px; background:rgba(59,130,246,0.1); border-radius:2px; overflow:hidden; margin-top:4px; }
+    .risk-fill { height:100%; border-radius:2px; transition:width 0.4s, background 0.4s; }
+    .risk-label { font-size:11px; color:var(--slate-l); margin-top:3px; font-family:var(--mono); }
+
+    /* RESOURCES */
+    .resource-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .resource-btn { background:var(--surface); border:1px solid rgba(59,130,246,0.12); border-radius:var(--r); padding:10px; cursor:pointer; transition:all 0.15s; text-align:center; }
+    .resource-btn:hover { border-color:rgba(59,130,246,0.35); }
+    .resource-btn.selected { border-color:var(--blue); background:rgba(59,130,246,0.08); }
+    .resource-icon { font-size:20px; margin-bottom:4px; }
+    .resource-name { font-size:12px; font-weight:500; color:var(--white); }
+    .resource-sensitivity { font-size:10px; font-family:var(--mono); margin-top:2px; }
+    .sens-critical { color:#FCA5A5; }
+    .sens-high { color:#FCD34D; }
+    .sens-low { color:#6EE7B7; }
+
+    /* POLICIES */
+    .policy-rule { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:6px; background:var(--surface); border:1px solid rgba(59,130,246,0.08); margin-bottom:5px; }
+    .rule-toggle { width:32px; height:18px; border-radius:9px; cursor:pointer; position:relative; transition:background 0.2s; flex-shrink:0; border:none; }
+    .rule-toggle.on { background:var(--blue); }
+    .rule-toggle.off { background:var(--slate); }
+    .rule-toggle::after { content:''; position:absolute; width:12px; height:12px; border-radius:50%; background:white; top:3px; transition:left 0.2s; }
+    .rule-toggle.on::after { left:17px; }
+    .rule-toggle.off::after { left:3px; }
+    .rule-text { font-size:12px; color:var(--slate-l); flex:1; }
+    .rule-text strong { color:var(--white); font-weight:500; }
+
+    /* EVAL BUTTON */
+    .eval-btn { width:100%; padding:12px; background:var(--blue); border:none; border-radius:var(--r); color:white; font-size:14px; font-weight:600; font-family:var(--sans); cursor:pointer; transition:background 0.15s; }
+    .eval-btn:hover { background:#2563EB; }
+    .eval-btn:active { transform:scale(0.99); }
 
     /* DECISION */
-    .decision-panel { border-radius: var(--r); overflow: hidden; transition: all 0.3s; }
-    .decision-header { padding: 20px 24px; display: flex; align-items: center; gap: 16px; }
-    .decision-icon { font-size: 36px; flex-shrink: 0; }
-    .decision-verdict { font-size: 22px; font-weight: 700; font-family: var(--mono); }
-    .decision-sub { font-size: 13px; margin-top: 2px; }
-    .decision-body { padding: 0 24px 20px; }
+    .decision-panel { border-radius:var(--r); overflow:hidden; transition:all 0.3s; }
+    .decision-header { padding:18px 22px; display:flex; align-items:center; gap:14px; }
+    .decision-icon { font-size:32px; flex-shrink:0; }
+    .decision-verdict { font-size:20px; font-weight:700; font-family:var(--mono); }
+    .decision-sub { font-size:12px; margin-top:2px; }
+    .decision-body { padding:0 22px 18px; }
+    .decision-panel.allow { background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); }
+    .decision-panel.allow .decision-verdict { color:var(--green); }
+    .decision-panel.deny { background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25); }
+    .decision-panel.deny .decision-verdict { color:var(--red); }
+    .decision-panel.stepup { background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.25); }
+    .decision-panel.stepup .decision-verdict { color:var(--amber); }
+    .decision-panel.idle { background:var(--card); border:1px solid rgba(59,130,246,0.1); }
+    .decision-panel.idle .decision-verdict { color:var(--slate-l); }
 
-    .decision-panel.allow { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); }
-    .decision-panel.allow .decision-verdict { color: var(--green); }
-    .decision-panel.allow .decision-sub { color: rgba(16,185,129,0.7); }
+    /* TRACE */
+    .trace-item { display:flex; align-items:flex-start; gap:10px; font-size:12px; padding:6px 0; border-bottom:1px solid rgba(59,130,246,0.05); }
+    .trace-item:last-child { border-bottom:none; }
+    .trace-icon { flex-shrink:0; font-size:13px; margin-top:1px; }
+    .trace-text { color:var(--slate-l); flex:1; line-height:1.5; }
+    .trace-text strong { color:var(--white); font-weight:500; }
+    .trace-result { font-family:var(--mono); font-size:10px; padding:1px 6px; border-radius:3px; flex-shrink:0; }
+    .tr-pass { background:rgba(16,185,129,0.15); color:#6EE7B7; }
+    .tr-fail { background:rgba(239,68,68,0.15); color:#FCA5A5; }
+    .tr-warn { background:rgba(245,158,11,0.15); color:#FCD34D; }
 
-    .decision-panel.deny { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); }
-    .decision-panel.deny .decision-verdict { color: var(--red); }
-    .decision-panel.deny .decision-sub { color: rgba(239,68,68,0.7); }
-
-    .decision-panel.stepup { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); }
-    .decision-panel.stepup .decision-verdict { color: var(--amber); }
-    .decision-panel.stepup .decision-sub { color: rgba(245,158,11,0.7); }
-
-    .decision-panel.idle { background: var(--card); border: 1px solid rgba(59,130,246,0.1); }
-    .decision-panel.idle .decision-verdict { color: var(--slate-l); }
-
-    /* EVALUATION TRACE */
-    .trace-list { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
-    .trace-item { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; padding: 6px 0; border-bottom: 1px solid rgba(59,130,246,0.05); }
-    .trace-item:last-child { border-bottom: none; }
-    .trace-icon { flex-shrink: 0; font-size: 14px; margin-top: 1px; }
-    .trace-text { color: var(--slate-l); flex: 1; line-height: 1.5; }
-    .trace-text strong { color: var(--white); font-weight: 500; }
-    .trace-result { font-family: var(--mono); font-size: 10px; padding: 1px 6px; border-radius: 3px; flex-shrink: 0; }
-    .tr-pass { background: rgba(16,185,129,0.15); color: #6EE7B7; }
-    .tr-fail { background: rgba(239,68,68,0.15); color: #FCA5A5; }
-    .tr-warn { background: rgba(245,158,11,0.15); color: #FCD34D; }
-    .tr-info { background: rgba(59,130,246,0.15); color: #93C5FD; }
-
-    /* AI EXPLANATION */
-    .ai-box { margin-top: 16px; background: rgba(59,130,246,0.04); border: 1px solid rgba(59,130,246,0.12); border-radius: var(--r); padding: 14px 16px; }
-    .ai-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-    .ai-label { font-family: var(--mono); font-size: 10px; color: var(--blue); text-transform: uppercase; letter-spacing: 0.08em; }
-    .ai-spinner { width: 12px; height: 12px; border: 2px solid rgba(59,130,246,0.2); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.8s linear infinite; display: none; }
-    .ai-spinner.active { display: block; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .ai-text { font-size: 13px; color: var(--slate-l); line-height: 1.7; }
-    .ai-text.loading { color: var(--slate); font-style: italic; }
+    /* AI BOX */
+    .ai-box { margin-top:14px; background:rgba(59,130,246,0.04); border:1px solid rgba(59,130,246,0.12); border-radius:var(--r); padding:12px 14px; }
+    .ai-header { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+    .ai-label { font-family:var(--mono); font-size:10px; color:var(--blue); text-transform:uppercase; letter-spacing:0.08em; }
+    .ai-spinner { width:12px; height:12px; border:2px solid rgba(59,130,246,0.2); border-top-color:var(--blue); border-radius:50%; animation:spin 0.8s linear infinite; display:none; }
+    .ai-spinner.active { display:block; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .ai-text { font-size:13px; color:var(--slate-l); line-height:1.7; }
 
     /* MITRE */
-    .mitre-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-    .mitre-tag { font-family: var(--mono); font-size: 10px; padding: 3px 8px; border-radius: 4px; background: rgba(167,139,250,0.1); color: #C4B5FD; border: 1px solid rgba(167,139,250,0.2); }
+    .mitre-grid { display:flex; flex-wrap:wrap; gap:5px; margin-top:10px; }
+    .mitre-tag { font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:4px; background:rgba(167,139,250,0.1); color:#C4B5FD; border:1px solid rgba(167,139,250,0.2); }
 
-    /* EVALUATE BTN */
-    .eval-btn { width: 100%; padding: 12px; background: var(--blue); border: none; border-radius: var(--r); color: white; font-size: 14px; font-weight: 600; font-family: var(--sans); cursor: pointer; transition: background 0.15s; margin-top: 4px; }
-    .eval-btn:hover { background: #2563EB; }
-    .eval-btn:active { transform: scale(0.99); }
+    /* OKTA SOURCE TAG */
+    .source-tag { font-family:var(--mono); font-size:10px; padding:2px 7px; border-radius:4px; }
+    .source-okta { background:rgba(16,185,129,0.1); color:#6EE7B7; border:1px solid rgba(16,185,129,0.2); }
+    .source-manual { background:rgba(59,130,246,0.1); color:#93C5FD; border:1px solid rgba(59,130,246,0.2); }
 
-    /* OPENROUTER KEY */
-    .key-strip { background: var(--card); border: 1px solid rgba(59,130,246,0.1); border-radius: var(--r); padding: 12px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .key-input { flex: 1; min-width: 200px; background: var(--surface); border: 1px solid rgba(59,130,246,0.15); border-radius: 6px; padding: 7px 10px; font-size: 12px; font-family: var(--mono); color: var(--white); outline: none; }
-    .key-input:focus { border-color: var(--blue); }
-    .key-label { font-size: 12px; color: var(--slate); }
-    .key-note { font-size: 11px; color: var(--slate); margin-top: 4px; width: 100%; }
+    /* OR API KEY */
+    .or-key-strip { max-width:1200px; margin:0 auto; padding:0 2rem 1rem; }
+    .or-key-inner { background:var(--card); border:1px solid rgba(59,130,246,0.08); border-radius:var(--r); padding:10px 16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .or-key-label { font-size:12px; color:var(--slate); }
+    .or-key-input { flex:1; min-width:200px; background:var(--surface); border:1px solid rgba(59,130,246,0.15); border-radius:6px; padding:6px 10px; font-size:12px; font-family:var(--mono); color:var(--white); outline:none; }
+    .or-key-input:focus { border-color:var(--blue); }
+    .or-key-note { font-size:11px; color:var(--slate); width:100%; }
 
-    /* FOOTER */
-    footer { text-align: center; padding: 2rem; font-family: var(--mono); font-size: 11px; color: var(--slate); border-top: 1px solid rgba(59,130,246,0.08); margin-top: 2rem; }
-    footer a { color: var(--blue); text-decoration: none; }
+    footer { text-align:center; padding:2rem; font-family:var(--mono); font-size:11px; color:var(--slate); border-top:1px solid rgba(59,130,246,0.08); margin-top:2rem; }
+    footer a { color:var(--blue); text-decoration:none; }
   </style>
 </head>
 <body>
 
 <nav>
   <a href="https://ishwaryaunfiltered.live" class="nav-brand">ishwarya@unfiltered:~$</a>
-  <span class="nav-title">Zero Trust Access Simulator</span>
-  <div class="nav-links">
-    <a href="https://ishwaryaunfiltered.live">Portfolio</a>
-    <a href="https://github.com/IshwaryaLakshmiC/ztna-simulator" target="_blank">GitHub</a>
-    <a href="https://ishwaryaunfiltered.live/ztna-scorer">ZTNA Scorer</a>
+  <div class="nav-right">
+    <div class="nav-links">
+      <a href="https://ishwaryaunfiltered.live">Portfolio</a>
+      <a href="https://github.com/IshwaryaLakshmiC/ztna-simulator" target="_blank">GitHub</a>
+    </div>
+    <div id="nav-auth-area"></div>
   </div>
 </nav>
 
-<!-- OpenRouter key strip -->
-<div style="max-width:1200px;margin:1rem auto;padding:0 2rem;">
-  <div class="key-strip">
-    <span class="key-label">OpenRouter API key (optional — enables AI explanations):</span>
-    <input class="key-input" id="or-key" type="password" placeholder="sk-or-v1-..." oninput="saveKey()" />
-    <span class="key-note">Key stored in browser session only · Get a free key at openrouter.ai · Without a key, the policy engine still runs — only AI explanations are disabled</span>
+<!-- Okta config + identity -->
+<div class="okta-bar">
+  <div id="okta-setup-panel" class="okta-config-panel">
+    <div class="okta-config-title">// Okta Integration — connect your IdP</div>
+    <div class="okta-config-grid">
+      <div class="cfg-group">
+        <span class="cfg-label">Okta Domain</span>
+        <input class="cfg-input" id="okta-domain" placeholder="dev-12345678.okta.com" />
+      </div>
+      <div class="cfg-group">
+        <span class="cfg-label">Client ID</span>
+        <input class="cfg-input" id="okta-client-id" placeholder="0oa1b2c3d4e5f6g7h8i9" />
+      </div>
+      <button class="btn btn-primary" onclick="initOkta()">Connect + Sign In</button>
+    </div>
+    <div class="or-row"><div class="or-line"></div><span class="or-text">or use demo mode</span><div class="or-line"></div></div>
+    <button class="btn btn-ghost" style="width:100%" onclick="enterDemoMode()">Continue without Okta — use simulated identities</button>
+    <p class="okta-note">
+      Free Okta dev account at <a href="https://developer.okta.com" target="_blank">developer.okta.com</a> ·
+      See <a href="https://github.com/IshwaryaLakshmiC/ztna-simulator#setup" target="_blank">setup guide</a> for configuration steps
+    </p>
+  </div>
+  <div id="okta-identity-panel" style="display:none"></div>
+</div>
+
+<!-- OpenRouter key -->
+<div class="or-key-strip">
+  <div class="or-key-inner">
+    <span class="or-key-label">OpenRouter key (enables AI explanations):</span>
+    <input class="or-key-input" id="or-key" type="password" placeholder="sk-or-v1-..." oninput="saveOrKey()" />
+    <span class="or-key-note">Free at openrouter.ai · Stored in session only · Without key, policy engine still runs fully</span>
   </div>
 </div>
 
 <div class="page">
-
-  <!-- LEFT: Scenario library + controls -->
-  <div class="left-col">
-
-    <!-- Scenarios -->
-    <div class="panel" style="margin-bottom:1.5rem">
-      <div class="panel-header">
-        <span class="panel-title">// Scenario Library</span>
-      </div>
-      <div class="panel-body" style="padding:12px">
-        <div id="scenario-list"></div>
-      </div>
+  <!-- LEFT -->
+  <div>
+    <div class="panel" style="margin-bottom:1.25rem">
+      <div class="panel-header"><span class="panel-title">// Scenario Library</span></div>
+      <div class="panel-body" style="padding:10px 12px" id="scenario-list"></div>
     </div>
-
-    <!-- Policy Rules -->
     <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">// Active Policies</span>
-        <span style="font-size:11px;color:var(--slate)">toggle to test</span>
-      </div>
-      <div class="panel-body">
-        <div class="policy-list" id="policy-list"></div>
-      </div>
+      <div class="panel-header"><span class="panel-title">// Active Policies</span><span style="font-size:11px;color:var(--slate)">toggle to test</span></div>
+      <div class="panel-body" id="policy-list"></div>
     </div>
-
   </div>
 
-  <!-- RIGHT: Identity + Resource + Decision -->
+  <!-- RIGHT -->
   <div class="right-col">
-
     <!-- Identity -->
     <div class="panel">
       <div class="panel-header">
         <span class="panel-title">// Identity Context</span>
-        <span style="font-size:11px;color:var(--slate)">who is requesting access</span>
+        <span id="identity-source-badge" class="source-tag source-manual">manual</span>
       </div>
       <div class="panel-body">
         <div class="attr-grid">
@@ -237,12 +262,8 @@
           <div class="attr-group">
             <span class="attr-label">Role / Group</span>
             <select class="attr-select" id="attr-role">
-              <option>engineer</option>
-              <option>admin</option>
-              <option>contractor</option>
-              <option>finance</option>
-              <option>executive</option>
-              <option>readonly</option>
+              <option>engineer</option><option>admin</option><option>contractor</option>
+              <option>finance</option><option>executive</option><option>readonly</option>
             </select>
           </div>
           <div class="attr-group">
@@ -257,7 +278,7 @@
           <div class="attr-group">
             <span class="attr-label">Auth Method</span>
             <select class="attr-select" id="attr-auth">
-              <option value="sso_okta">SSO via Okta</option>
+              <option value="sso_okta">SSO via Okta ✓</option>
               <option value="sso_azure">SSO via Azure AD</option>
               <option value="local">Local credentials</option>
               <option value="stolen">Credential stuffing</option>
@@ -282,10 +303,8 @@
             </select>
           </div>
         </div>
-
-        <!-- Identity Risk Score -->
-        <div style="margin-top:14px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <div style="margin-top:12px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
             <span class="attr-label">Identity Risk Score</span>
             <span id="risk-val" style="font-family:var(--mono);font-size:12px;color:var(--white)">0</span>
           </div>
@@ -295,12 +314,9 @@
       </div>
     </div>
 
-    <!-- Device Posture -->
+    <!-- Device -->
     <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">// Device Posture</span>
-        <span style="font-size:11px;color:var(--slate)">endpoint trust signals</span>
-      </div>
+      <div class="panel-header"><span class="panel-title">// Device Posture</span><span style="font-size:11px;color:var(--slate)">endpoint trust signals</span></div>
       <div class="panel-body">
         <div class="attr-grid">
           <div class="attr-group">
@@ -315,7 +331,7 @@
           <div class="attr-group">
             <span class="attr-label">OS Patch Status</span>
             <select class="attr-select" id="dev-patch">
-              <option value="current">Current (< 30 days)</option>
+              <option value="current">Current (&lt; 30 days)</option>
               <option value="stale">Stale (30-90 days)</option>
               <option value="critical">Critical patches missing</option>
             </select>
@@ -347,7 +363,7 @@
             <span class="attr-label">Last Seen</span>
             <select class="attr-select" id="dev-seen">
               <option value="now">Active session</option>
-              <option value="recent">< 24 hours</option>
+              <option value="recent">&lt; 24 hours</option>
               <option value="stale">3-7 days</option>
               <option value="new">First time (new device)</option>
             </select>
@@ -358,109 +374,36 @@
 
     <!-- Resource -->
     <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">// Target Resource</span>
-        <span style="font-size:11px;color:var(--slate)">what they're trying to access</span>
-      </div>
-      <div class="panel-body">
-        <div class="resource-grid" id="resource-grid"></div>
-      </div>
+      <div class="panel-header"><span class="panel-title">// Target Resource</span><span style="font-size:11px;color:var(--slate)">what they're trying to access</span></div>
+      <div class="panel-body"><div class="resource-grid" id="resource-grid"></div></div>
     </div>
 
-    <!-- Evaluate button -->
     <button class="eval-btn" onclick="evaluate()">⚡ Evaluate Access Request</button>
-
-    <!-- Decision output -->
     <div class="decision-panel idle" id="decision-panel">
       <div class="decision-header">
         <div class="decision-icon">🔒</div>
         <div>
           <div class="decision-verdict">AWAITING EVALUATION</div>
-          <div class="decision-sub" style="color:var(--slate-l)">Configure identity, device, and resource then click Evaluate</div>
+          <div class="decision-sub" style="color:var(--slate-l)">Configure identity, device, and resource — then click Evaluate</div>
         </div>
       </div>
     </div>
-
   </div>
 </div>
 
 <footer>
   Zero Trust Access Simulator · <a href="https://ishwaryaunfiltered.live">ishwaryaunfiltered.live</a> ·
-  <a href="https://github.com/IshwaryaLakshmiC/ztna-simulator" target="_blank">View on GitHub</a> ·
-  Built by <a href="https://linkedin.com/in/ishwaryachengalvarayan" target="_blank">Ishwarya Lakshmi C</a>
+  <a href="https://github.com/IshwaryaLakshmiC/ztna-simulator" target="_blank">GitHub</a> ·
+  Built by <a href="https://linkedin.com/in/ishwaryachengalvarayan">Ishwarya Lakshmi C</a>
 </footer>
 
 <script>
-// ── DATA ─────────────────────────────────────────────────────
-
-const SCENARIOS = [
-  {
-    id: 'trusted_employee',
-    icon: '✅',
-    label: 'Trusted employee, managed device',
-    sub: 'Normal business access',
-    badge: 'legit',
-    attrs: { user:'sarah.chen', role:'engineer', mfa:'hardware', auth:'sso_okta', location:'corporate', time:'business' },
-    device: { mgmt:'mdm_managed', patch:'current', edr:'active', encrypt:'yes', browser:'managed', seen:'now' },
-    resource: 'internal_app',
-    expectedVerdict: 'allow'
-  },
-  {
-    id: 'stolen_creds',
-    icon: '🔴',
-    label: 'Stolen credentials + unknown device',
-    sub: 'Credential stuffing attack',
-    badge: 'attack',
-    attrs: { user:'admin.user', role:'admin', mfa:'none', auth:'stolen', location:'tor', time:'after' },
-    device: { mgmt:'unknown', patch:'critical', edr:'none', encrypt:'no', browser:'personal', seen:'new' },
-    resource: 'prod_database',
-    expectedVerdict: 'deny'
-  },
-  {
-    id: 'contractor_byod',
-    icon: '🟡',
-    label: 'Contractor on personal device',
-    sub: 'BYOD + limited access request',
-    badge: 'edge',
-    attrs: { user:'contractor.ext', role:'contractor', mfa:'totp', auth:'sso_okta', location:'home', time:'business' },
-    device: { mgmt:'byod', patch:'stale', edr:'inactive', encrypt:'no', browser:'personal', seen:'recent' },
-    resource: 'customer_data',
-    expectedVerdict: 'deny'
-  },
-  {
-    id: 'after_hours_admin',
-    icon: '🟠',
-    label: 'Admin access at 3am, new device',
-    sub: 'Unusual time + first-seen device',
-    badge: 'attack',
-    attrs: { user:'john.admin', role:'admin', mfa:'totp', auth:'sso_okta', location:'home', time:'after' },
-    device: { mgmt:'corp_unmanaged', patch:'current', edr:'active', encrypt:'yes', browser:'personal', seen:'new' },
-    resource: 'prod_database',
-    expectedVerdict: 'stepup'
-  },
-  {
-    id: 'executive_travel',
-    icon: '✈️',
-    label: 'Executive on travel, high-risk country',
-    sub: 'Legitimate but risky context',
-    badge: 'edge',
-    attrs: { user:'ceo.jane', role:'executive', mfa:'hardware', auth:'sso_okta', location:'highrisk', time:'business' },
-    device: { mgmt:'mdm_managed', patch:'current', edr:'active', encrypt:'yes', browser:'managed', seen:'recent' },
-    resource: 'internal_app',
-    expectedVerdict: 'stepup'
-  },
-  {
-    id: 'ci_pipeline',
-    icon: '🤖',
-    label: 'CI/CD service account, no MFA',
-    sub: 'Machine identity requesting S3',
-    badge: 'edge',
-    attrs: { user:'svc-ci-runner', role:'readonly', mfa:'none', auth:'local', location:'corporate', time:'business' },
-    device: { mgmt:'unknown', patch:'current', edr:'none', encrypt:'no', browser:'cli', seen:'now' },
-    resource: 's3_artifacts',
-    expectedVerdict: 'allow'
-  },
-];
+// ── CONFIG (filled in by user or via URL params) ──────────────
+let OKTA_DOMAIN = localStorage.getItem('okta_domain') || '';
+let OKTA_CLIENT_ID = localStorage.getItem('okta_client_id') || '';
+let oktaAuth = null;
+let oktaUser = null;
+let demoMode = false;
 
 const RESOURCES = [
   { id:'internal_app', icon:'🌐', name:'Internal App', sensitivity:'medium', label:'HIGH', cls:'sens-high' },
@@ -471,313 +414,449 @@ const RESOURCES = [
   { id:'logs_readonly', icon:'📋', name:'Logs (Read)', sensitivity:'low', label:'LOW', cls:'sens-low' },
 ];
 
+const SCENARIOS = [
+  { id:'trusted', icon:'✅', label:'Trusted employee, managed device', sub:'Normal business access', badge:'legit',
+    attrs:{ user:'sarah.chen', role:'engineer', mfa:'hardware', auth:'sso_okta', location:'corporate', time:'business' },
+    device:{ mgmt:'mdm_managed', patch:'current', edr:'active', encrypt:'yes', browser:'managed', seen:'now' }, resource:'internal_app' },
+  { id:'stolen', icon:'🔴', label:'Stolen credentials + unknown device', sub:'Credential stuffing attack', badge:'attack',
+    attrs:{ user:'admin.user', role:'admin', mfa:'none', auth:'stolen', location:'tor', time:'after' },
+    device:{ mgmt:'unknown', patch:'critical', edr:'none', encrypt:'no', browser:'personal', seen:'new' }, resource:'prod_database' },
+  { id:'contractor', icon:'🟡', label:'Contractor on personal device', sub:'BYOD + critical resource', badge:'edge',
+    attrs:{ user:'contractor.ext', role:'contractor', mfa:'totp', auth:'sso_okta', location:'home', time:'business' },
+    device:{ mgmt:'byod', patch:'stale', edr:'inactive', encrypt:'no', browser:'personal', seen:'recent' }, resource:'customer_data' },
+  { id:'admin_night', icon:'🟠', label:'Admin access at 3am, new device', sub:'Unusual time + first-seen device', badge:'attack',
+    attrs:{ user:'john.admin', role:'admin', mfa:'totp', auth:'sso_okta', location:'home', time:'after' },
+    device:{ mgmt:'corp_unmanaged', patch:'current', edr:'active', encrypt:'yes', browser:'personal', seen:'new' }, resource:'prod_database' },
+  { id:'exec_travel', icon:'✈️', label:'Executive on travel, high-risk country', sub:'Legitimate but risky context', badge:'edge',
+    attrs:{ user:'jane.ceo', role:'executive', mfa:'hardware', auth:'sso_okta', location:'highrisk', time:'business' },
+    device:{ mgmt:'mdm_managed', patch:'current', edr:'active', encrypt:'yes', browser:'managed', seen:'recent' }, resource:'internal_app' },
+  { id:'ci', icon:'🤖', label:'CI/CD service account', sub:'Machine identity requesting S3', badge:'edge',
+    attrs:{ user:'svc-ci-runner', role:'readonly', mfa:'none', auth:'local', location:'corporate', time:'business' },
+    device:{ mgmt:'unknown', patch:'current', edr:'none', encrypt:'no', browser:'cli', seen:'now' }, resource:'s3_artifacts' },
+];
+
 const POLICIES = [
   { id:'require_mfa', label:'Require MFA', desc:'Block access if no MFA enrolled', default:true },
   { id:'block_tor', label:'Block Tor / anonymous proxies', desc:'Deny all Tor exit node traffic', default:true },
-  { id:'require_mdm', label:'Require managed device for critical resources', desc:'BYOD blocked from CRITICAL resources', default:true },
-  { id:'stepup_new_device', label:'Step-up auth on new device', desc:'Require additional verification on first-seen device', default:true },
-  { id:'block_highrisk_country', label:'Block high-risk countries', desc:'Deny access from sanctioned regions', default:false },
-  { id:'off_hours_alert', label:'Step-up for after-hours admin access', desc:'Admin access outside 8am-7pm requires confirmation', default:true },
-  { id:'block_weak_mfa', label:'Treat SMS MFA as insufficient for critical', desc:'SMS-only MFA denied on CRITICAL resources', default:true },
+  { id:'require_mdm', label:'Require managed device for critical', desc:'BYOD blocked from CRITICAL resources', default:true },
+  { id:'stepup_new_device', label:'Step-up on new device', desc:'Additional verification on first-seen device', default:true },
+  { id:'block_highrisk', label:'Block high-risk countries', desc:'Deny access from sanctioned regions', default:false },
+  { id:'off_hours_admin', label:'Step-up for after-hours admin', desc:'Admin access outside business hours requires confirmation', default:true },
+  { id:'weak_mfa_critical', label:'SMS MFA insufficient for critical', desc:'SMS-only MFA denied on CRITICAL resources', default:true },
 ];
 
-// State
-let state = {
-  selectedResource: 'internal_app',
-  policies: Object.fromEntries(POLICIES.map(p => [p.id, p.default])),
-  orKey: '',
-};
+let state = { selectedResource:'internal_app', policies:Object.fromEntries(POLICIES.map(p=>[p.id,p.default])), orKey:'' };
 
-// ── INIT ──────────────────────────────────────────────────────
+// ── OKTA INIT ─────────────────────────────────────────────────
+function initOkta() {
+  const domain = document.getElementById('okta-domain').value.trim();
+  const clientId = document.getElementById('okta-client-id').value.trim();
+  if (!domain || !clientId) { alert('Please enter both Okta domain and Client ID'); return; }
+
+  OKTA_DOMAIN = domain;
+  OKTA_CLIENT_ID = clientId;
+  localStorage.setItem('okta_domain', domain);
+  localStorage.setItem('okta_client_id', clientId);
+
+  setupOktaAuth(domain, clientId);
+}
+
+function setupOktaAuth(domain, clientId) {
+  oktaAuth = new OktaAuth({
+    issuer: `https://${domain}/oauth2/default`,
+    clientId: clientId,
+    redirectUri: window.location.origin + window.location.pathname,
+    scopes: ['openid', 'profile', 'email', 'groups'],
+    pkce: true,
+    tokenManager: { storage: 'sessionStorage' }
+  });
+
+  // Handle redirect callback
+  if (window.location.search.includes('code=')) {
+    oktaAuth.handleRedirectCallback().then(() => {
+      window.history.replaceState({}, '', window.location.pathname);
+      loadOktaUser();
+    }).catch(err => {
+      console.error('Okta callback error:', err);
+      showOktaError(err.message);
+    });
+  } else {
+    oktaAuth.isAuthenticated().then(isAuth => {
+      if (isAuth) loadOktaUser();
+      else signInWithOkta();
+    });
+  }
+}
+
+function signInWithOkta() {
+  if (!oktaAuth) return;
+  oktaAuth.signInWithRedirect({ prompt: 'login' });
+}
+
+function signOutOkta() {
+  if (!oktaAuth) return;
+  localStorage.removeItem('okta_domain');
+  localStorage.removeItem('okta_client_id');
+  oktaAuth.signOut().then(() => location.reload());
+}
+
+async function loadOktaUser() {
+  try {
+    const tokens = await oktaAuth.tokenManager.getTokens();
+    const idToken = tokens.idToken;
+    if (!idToken) { signInWithOkta(); return; }
+
+    const claims = idToken.claims;
+    oktaUser = {
+      name: claims.name || claims.preferred_username || claims.email,
+      email: claims.email,
+      groups: claims.groups || [],
+      sub: claims.sub,
+      amr: claims.amr || [],
+    };
+
+    showOktaIdentity();
+    applyOktaToForm();
+  } catch(err) {
+    console.error('Token error:', err);
+    signInWithOkta();
+  }
+}
+
+function showOktaIdentity() {
+  document.getElementById('okta-setup-panel').style.display = 'none';
+  const panel = document.getElementById('okta-identity-panel');
+  panel.style.display = 'block';
+
+  const initials = (oktaUser.name || 'U').split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2);
+  const groups = oktaUser.groups.filter(g => !['Everyone','All Users'].includes(g));
+  const mfaMethod = oktaUser.amr.includes('hwk') ? 'hardware' : oktaUser.amr.includes('otp') ? 'totp' : oktaUser.amr.includes('sms') ? 'sms' : 'totp';
+
+  panel.innerHTML = `
+    <div class="identity-badge">
+      <div class="id-avatar">${initials}</div>
+      <div class="id-info">
+        <div class="id-name">${oktaUser.name}</div>
+        <div class="id-email">${oktaUser.email}</div>
+        <div class="id-groups">
+          <span class="id-source">✓ Live Okta SSO</span>
+          ${groups.map(g=>`<span class="id-group-tag">${g}</span>`).join('')}
+          <span class="id-group-tag">MFA: ${mfaMethod}</span>
+        </div>
+      </div>
+      <div class="id-actions">
+        <button class="btn btn-ghost" onclick="signOutOkta()" style="font-size:12px;padding:6px 12px">Sign out</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('identity-source-badge').className = 'source-tag source-okta';
+  document.getElementById('identity-source-badge').textContent = '✓ live okta';
+  document.getElementById('nav-auth-area').innerHTML = `<span style="font-family:var(--mono);font-size:11px;color:#6EE7B7">● ${oktaUser.email}</span>`;
+}
+
+function applyOktaToForm() {
+  if (!oktaUser) return;
+
+  // Map Okta groups to roles
+  const groups = oktaUser.groups.map(g=>g.toLowerCase());
+  let role = 'readonly';
+  if (groups.some(g=>g.includes('admin'))) role = 'admin';
+  else if (groups.some(g=>g.includes('exec'))) role = 'executive';
+  else if (groups.some(g=>g.includes('engineer')||g.includes('dev'))) role = 'engineer';
+  else if (groups.some(g=>g.includes('contractor')||g.includes('ext'))) role = 'contractor';
+  else if (groups.some(g=>g.includes('finance'))) role = 'finance';
+
+  // Map AMR to MFA method
+  const amr = oktaUser.amr || [];
+  let mfa = 'totp';
+  if (amr.includes('hwk')) mfa = 'hardware';
+  else if (amr.includes('sms')) mfa = 'sms';
+  else if (!amr.includes('otp') && !amr.includes('hwk')) mfa = 'none';
+
+  const userName = oktaUser.email?.split('@')[0] || oktaUser.name;
+  document.getElementById('attr-user').value = userName;
+  setSelect('attr-role', role);
+  setSelect('attr-mfa', mfa);
+  setSelect('attr-auth', 'sso_okta');
+
+  // Lock Okta-sourced fields visually
+  ['attr-user','attr-role','attr-mfa','attr-auth'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.classList.add('okta-locked'); el.title = 'Sourced from Okta IdP'; }
+  });
+
+  updateRiskScore();
+}
+
+function enterDemoMode() {
+  demoMode = true;
+  document.getElementById('okta-setup-panel').style.display = 'none';
+  document.getElementById('nav-auth-area').innerHTML = `<span style="font-family:var(--mono);font-size:11px;color:var(--slate)">demo mode</span>`;
+}
+
+function showOktaError(msg) {
+  document.getElementById('okta-setup-panel').innerHTML += `<p style="color:#FCA5A5;font-size:12px;margin-top:8px">⚠ ${msg}</p>`;
+}
+
+// ── RENDER ────────────────────────────────────────────────────
 function init() {
   renderScenarios();
   renderResources();
   renderPolicies();
   updateRiskScore();
   attachListeners();
-  const saved = sessionStorage.getItem('or_key');
-  if (saved) { document.getElementById('or-key').value = saved; state.orKey = saved; }
+
+  const orSaved = sessionStorage.getItem('or_key');
+  if (orSaved) { document.getElementById('or-key').value = orSaved; state.orKey = orSaved; }
+
+  // Auto-init if saved Okta config
+  if (OKTA_DOMAIN && OKTA_CLIENT_ID) {
+    document.getElementById('okta-domain').value = OKTA_DOMAIN;
+    document.getElementById('okta-client-id').value = OKTA_CLIENT_ID;
+    setupOktaAuth(OKTA_DOMAIN, OKTA_CLIENT_ID);
+  }
 }
 
-function saveKey() {
+function saveOrKey() {
   state.orKey = document.getElementById('or-key').value;
   sessionStorage.setItem('or_key', state.orKey);
 }
 
-function attachListeners() {
-  document.querySelectorAll('.attr-select, .attr-input, [id^="dev-"]').forEach(el => {
-    el.addEventListener('change', updateRiskScore);
-    el.addEventListener('input', updateRiskScore);
-  });
-}
-
-// ── RENDER ────────────────────────────────────────────────────
 function renderScenarios() {
-  document.getElementById('scenario-list').innerHTML = SCENARIOS.map(s => `
+  document.getElementById('scenario-list').innerHTML = SCENARIOS.map(s=>`
     <button class="scenario-chip" id="chip-${s.id}" onclick="loadScenario('${s.id}')">
       <span class="chip-icon">${s.icon}</span>
-      <div>
-        <div class="chip-label">${s.label}</div>
-        <div class="chip-sub">${s.sub}</div>
-        <span class="chip-badge badge-${s.badge}">${s.badge.toUpperCase()}</span>
-      </div>
-    </button>
-  `).join('');
+      <div><div class="chip-label">${s.label}</div><div class="chip-sub">${s.sub}</div>
+      <span class="chip-badge badge-${s.badge}">${s.badge.toUpperCase()}</span></div>
+    </button>`).join('');
 }
 
 function renderResources() {
-  document.getElementById('resource-grid').innerHTML = RESOURCES.map(r => `
-    <button class="resource-btn ${r.id === state.selectedResource ? 'selected' : ''}"
-      onclick="selectResource('${r.id}')">
+  document.getElementById('resource-grid').innerHTML = RESOURCES.map(r=>`
+    <button class="resource-btn ${r.id===state.selectedResource?'selected':''}" onclick="selectResource('${r.id}')">
       <div class="resource-icon">${r.icon}</div>
       <div class="resource-name">${r.name}</div>
       <div class="resource-sensitivity ${r.cls}">${r.label}</div>
-    </button>
-  `).join('');
+    </button>`).join('');
 }
 
 function renderPolicies() {
-  document.getElementById('policy-list').innerHTML = POLICIES.map(p => `
+  document.getElementById('policy-list').innerHTML = POLICIES.map(p=>`
     <div class="policy-rule">
-      <button class="rule-toggle ${state.policies[p.id] ? 'on' : 'off'}"
-        onclick="togglePolicy('${p.id}')"></button>
+      <button class="rule-toggle ${state.policies[p.id]?'on':'off'}" onclick="togglePolicy('${p.id}')"></button>
       <div class="rule-text"><strong>${p.label}</strong><br>${p.desc}</div>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
-function selectResource(id) {
-  state.selectedResource = id;
-  renderResources();
-}
-
-function togglePolicy(id) {
-  state.policies[id] = !state.policies[id];
-  renderPolicies();
-}
+function selectResource(id) { state.selectedResource=id; renderResources(); }
+function togglePolicy(id) { state.policies[id]=!state.policies[id]; renderPolicies(); }
 
 function loadScenario(id) {
-  const s = SCENARIOS.find(x => x.id === id);
+  if (oktaUser) {
+    // With Okta: only load device + resource, keep identity from Okta
+    const s = SCENARIOS.find(x=>x.id===id);
+    if (!s) return;
+    document.querySelectorAll('.scenario-chip').forEach(c=>c.classList.remove('active'));
+    document.getElementById(`chip-${id}`)?.classList.add('active');
+    setSelect('dev-mgmt', s.device.mgmt);
+    setSelect('dev-patch', s.device.patch);
+    setSelect('dev-edr', s.device.edr);
+    setSelect('dev-encrypt', s.device.encrypt);
+    setSelect('dev-browser', s.device.browser);
+    setSelect('dev-seen', s.device.seen);
+    selectResource(s.resource);
+    updateRiskScore();
+    setTimeout(evaluate, 200);
+    return;
+  }
+  // Without Okta: load everything
+  const s = SCENARIOS.find(x=>x.id===id);
   if (!s) return;
-  document.querySelectorAll('.scenario-chip').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('.scenario-chip').forEach(c=>c.classList.remove('active'));
   document.getElementById(`chip-${id}`)?.classList.add('active');
-  // Set identity attrs
   document.getElementById('attr-user').value = s.attrs.user;
   setSelect('attr-role', s.attrs.role);
   setSelect('attr-mfa', s.attrs.mfa);
   setSelect('attr-auth', s.attrs.auth);
   setSelect('attr-location', s.attrs.location);
   setSelect('attr-time', s.attrs.time);
-  // Set device
   setSelect('dev-mgmt', s.device.mgmt);
   setSelect('dev-patch', s.device.patch);
   setSelect('dev-edr', s.device.edr);
   setSelect('dev-encrypt', s.device.encrypt);
   setSelect('dev-browser', s.device.browser);
   setSelect('dev-seen', s.device.seen);
-  // Set resource
   selectResource(s.resource);
   updateRiskScore();
-  // Auto-evaluate
-  setTimeout(evaluate, 300);
+  setTimeout(evaluate, 200);
 }
 
 function setSelect(id, value) {
   const el = document.getElementById(id);
   if (!el) return;
-  for (let opt of el.options) {
-    if (opt.value === value) { el.value = value; return; }
-  }
+  for (let o of el.options) { if (o.value===value) { el.value=value; return; } }
+  el.options[0].selected = true;
+}
+
+function attachListeners() {
+  document.querySelectorAll('.attr-select,.attr-input,[id^="dev-"]').forEach(el=>{
+    el.addEventListener('change', updateRiskScore);
+    el.addEventListener('input', updateRiskScore);
+  });
 }
 
 // ── RISK SCORE ────────────────────────────────────────────────
-function calcIdentityRisk() {
-  let score = 0;
-  const mfa = document.getElementById('attr-mfa')?.value;
-  const auth = document.getElementById('attr-auth')?.value;
-  const loc = document.getElementById('attr-location')?.value;
-  const time = document.getElementById('attr-time')?.value;
-  const seen = document.getElementById('dev-seen')?.value;
-
-  if (mfa === 'none') score += 30;
-  else if (mfa === 'sms') score += 15;
-  else if (mfa === 'totp') score += 5;
-
-  if (auth === 'stolen') score += 40;
-  else if (auth === 'local') score += 10;
-
-  if (loc === 'tor') score += 30;
-  else if (loc === 'highrisk') score += 20;
-  else if (loc === 'unknown') score += 10;
-
-  if (time === 'after') score += 10;
-  else if (time === 'weekend') score += 5;
-
-  if (seen === 'new') score += 15;
-
-  const mgmt = document.getElementById('dev-mgmt')?.value;
-  const patch = document.getElementById('dev-patch')?.value;
-  const edr = document.getElementById('dev-edr')?.value;
-
-  if (mgmt === 'unknown') score += 15;
-  else if (mgmt === 'byod') score += 10;
-
-  if (patch === 'critical') score += 15;
-  else if (patch === 'stale') score += 5;
-
-  if (edr === 'none') score += 10;
-  else if (edr === 'inactive') score += 5;
-
-  return Math.min(100, score);
+function calcRisk() {
+  let s = 0;
+  const get = id => document.getElementById(id)?.value || '';
+  const mfa=get('attr-mfa'), auth=get('attr-auth'), loc=get('attr-location'),
+        time=get('attr-time'), seen=get('dev-seen'), mgmt=get('dev-mgmt'),
+        patch=get('dev-patch'), edr=get('dev-edr');
+  if(mfa==='none') s+=30; else if(mfa==='sms') s+=15; else if(mfa==='totp') s+=5;
+  if(auth==='stolen') s+=40; else if(auth==='local') s+=10;
+  if(loc==='tor') s+=30; else if(loc==='highrisk') s+=20; else if(loc==='unknown') s+=10;
+  if(time==='after') s+=10; else if(time==='weekend') s+=5;
+  if(seen==='new') s+=15;
+  if(mgmt==='unknown') s+=15; else if(mgmt==='byod') s+=10;
+  if(patch==='critical') s+=15; else if(patch==='stale') s+=5;
+  if(edr==='none') s+=10; else if(edr==='inactive') s+=5;
+  return Math.min(100, s);
 }
 
 function updateRiskScore() {
-  const score = calcIdentityRisk();
+  const score = calcRisk();
   const fill = document.getElementById('risk-fill');
   const val = document.getElementById('risk-val');
   const label = document.getElementById('risk-label');
-  if (!fill) return;
-
-  fill.style.width = score + '%';
+  if(!fill) return;
+  fill.style.width = score+'%';
   val.textContent = score;
-
-  if (score >= 70) { fill.style.background = '#EF4444'; label.textContent = 'HIGH RISK — multiple trust signals failed'; label.style.color = '#FCA5A5'; }
-  else if (score >= 40) { fill.style.background = '#F59E0B'; label.textContent = 'ELEVATED — some trust signals degraded'; label.style.color = '#FCD34D'; }
-  else if (score >= 20) { fill.style.background = '#3B82F6'; label.textContent = 'MODERATE — minor risk factors present'; label.style.color = '#93C5FD'; }
-  else { fill.style.background = '#10B981'; label.textContent = 'LOW — strong trust posture'; label.style.color = '#6EE7B7'; }
+  if(score>=70){ fill.style.background='#EF4444'; label.textContent='HIGH RISK — multiple trust signals failed'; label.style.color='#FCA5A5'; }
+  else if(score>=40){ fill.style.background='#F59E0B'; label.textContent='ELEVATED — some trust signals degraded'; label.style.color='#FCD34D'; }
+  else if(score>=20){ fill.style.background='#3B82F6'; label.textContent='MODERATE — minor risk factors present'; label.style.color='#93C5FD'; }
+  else { fill.style.background='#10B981'; label.textContent='LOW — strong trust posture'; label.style.color='#6EE7B7'; }
 }
 
 // ── POLICY ENGINE ─────────────────────────────────────────────
 function evaluate() {
-  const ctx = gatherContext();
-  const trace = [];
-  let verdict = 'allow';
-  let denyReasons = [];
-  let stepupReasons = [];
+  const get = id => document.getElementById(id)?.value||'';
+  const ctx = {
+    user:get('attr-user'), role:get('attr-role'), mfa:get('attr-mfa'),
+    auth:get('attr-auth'), location:get('attr-location'), time:get('attr-time'),
+    devMgmt:get('dev-mgmt'), devPatch:get('dev-patch'), devEdr:get('dev-edr'),
+    devEncrypt:get('dev-encrypt'), devBrowser:get('dev-browser'), devSeen:get('dev-seen'),
+    fromOkta: !!oktaUser,
+    oktaGroups: oktaUser?.groups || [],
+  };
 
-  const resource = RESOURCES.find(r => r.id === state.selectedResource);
-  const isCritical = resource?.sensitivity === 'critical';
+  const resource = RESOURCES.find(r=>r.id===state.selectedResource);
+  const isCritical = resource?.sensitivity==='critical';
+  const trace=[], denyReasons=[], stepupReasons=[];
+  let verdict='allow';
 
-  // 1. MFA check
-  if (state.policies.require_mfa && ctx.mfa === 'none') {
-    trace.push({ icon:'❌', text:'<strong>MFA Required</strong> — user has no MFA enrolled', result:'BLOCKED', cls:'tr-fail' });
-    verdict = 'deny'; denyReasons.push('no MFA enrolled');
-  } else if (ctx.mfa === 'none') {
-    trace.push({ icon:'⚠️', text:'No MFA enrolled (policy disabled — would normally block)', result:'SKIPPED', cls:'tr-warn' });
-  } else if (ctx.mfa === 'sms' && isCritical && state.policies.block_weak_mfa) {
-    trace.push({ icon:'❌', text:`<strong>Weak MFA (SMS)</strong> — insufficient for ${resource.name} (CRITICAL resource)`, result:'BLOCKED', cls:'tr-fail' });
-    verdict = 'deny'; denyReasons.push('SMS MFA insufficient for critical resource');
-  } else {
-    trace.push({ icon:'✅', text:`MFA verified — <strong>${ctx.mfa.replace('_',' ')}</strong>`, result:'PASS', cls:'tr-pass' });
+  // Okta authentication signal
+  if(ctx.fromOkta) {
+    trace.push({icon:'✅', text:`<strong>Okta SSO verified</strong> — authenticated via ${ctx.oktaGroups.length ? ctx.oktaGroups.filter(g=>!['Everyone'].includes(g)).join(', ') : 'Okta'} · session token valid`, result:'PASS', cls:'tr-pass'});
   }
 
-  // 2. Auth method
-  if (ctx.auth === 'stolen') {
-    trace.push({ icon:'🚨', text:'<strong>Credential stuffing detected</strong> — auth pattern matches known attack signatures', result:'BLOCKED', cls:'tr-fail' });
-    verdict = 'deny'; denyReasons.push('credential stuffing pattern detected');
-  } else if (ctx.auth === 'local') {
-    trace.push({ icon:'⚠️', text:'Local credentials used — SSO not enforced', result:'WARN', cls:'tr-warn' });
-    if (isCritical) { stepupReasons.push('local auth on critical resource'); }
-  } else {
-    trace.push({ icon:'✅', text:`SSO verified — <strong>${ctx.auth.replace('sso_','').toUpperCase()}</strong>`, result:'PASS', cls:'tr-pass' });
+  // MFA
+  if(state.policies.require_mfa && ctx.mfa==='none') {
+    trace.push({icon:'❌', text:'<strong>MFA Required</strong> — user has no MFA enrolled', result:'BLOCKED', cls:'tr-fail'});
+    verdict='deny'; denyReasons.push('no MFA enrolled');
+  } else if(ctx.mfa==='sms' && isCritical && state.policies.weak_mfa_critical) {
+    trace.push({icon:'❌', text:`<strong>Weak MFA (SMS)</strong> — insufficient for ${resource.name} (CRITICAL resource)`, result:'BLOCKED', cls:'tr-fail'});
+    verdict='deny'; denyReasons.push('SMS MFA insufficient for critical resource');
+  } else if(ctx.mfa!=='none') {
+    trace.push({icon:'✅', text:`MFA verified — <strong>${ctx.mfa.replace('_',' ')}</strong>`, result:'PASS', cls:'tr-pass'});
   }
 
-  // 3. Network / location
-  if (ctx.location === 'tor' && state.policies.block_tor) {
-    trace.push({ icon:'❌', text:'<strong>Tor exit node detected</strong> — anonymous network blocked by policy', result:'BLOCKED', cls:'tr-fail' });
-    verdict = 'deny'; denyReasons.push('Tor exit node blocked');
-  } else if (ctx.location === 'highrisk' && state.policies.block_highrisk_country) {
-    trace.push({ icon:'❌', text:'<strong>High-risk country</strong> — geo-block policy active', result:'BLOCKED', cls:'tr-fail' });
-    verdict = 'deny'; denyReasons.push('high-risk country blocked');
-  } else if (ctx.location === 'highrisk') {
-    trace.push({ icon:'⚠️', text:'High-risk country — policy disabled, but risk score elevated', result:'WARN', cls:'tr-warn' });
+  // Auth method
+  if(ctx.auth==='stolen') {
+    trace.push({icon:'🚨', text:'<strong>Credential stuffing detected</strong> — auth pattern matches known attack signatures', result:'BLOCKED', cls:'tr-fail'});
+    verdict='deny'; denyReasons.push('credential stuffing detected');
+  } else if(ctx.auth==='local' && isCritical) {
+    trace.push({icon:'⚠️', text:'Local credentials on critical resource — SSO strongly recommended', result:'WARN', cls:'tr-warn'});
+    stepupReasons.push('local auth on critical resource');
+  } else if(ctx.auth.startsWith('sso')) {
+    trace.push({icon:'✅', text:`SSO verified — <strong>${ctx.auth.replace('sso_','').toUpperCase()}${ctx.fromOkta?' (live)':''}</strong>`, result:'PASS', cls:'tr-pass'});
+  }
+
+  // Network
+  if(ctx.location==='tor' && state.policies.block_tor) {
+    trace.push({icon:'❌', text:'<strong>Tor exit node blocked</strong> — anonymous network policy active', result:'BLOCKED', cls:'tr-fail'});
+    verdict='deny'; denyReasons.push('Tor exit node');
+  } else if(ctx.location==='highrisk' && state.policies.block_highrisk) {
+    trace.push({icon:'❌', text:'<strong>High-risk country blocked</strong> — geo-block policy active', result:'BLOCKED', cls:'tr-fail'});
+    verdict='deny'; denyReasons.push('high-risk country');
+  } else if(ctx.location==='highrisk') {
+    trace.push({icon:'⚠️', text:'High-risk country — geo-block policy off, but risk score elevated', result:'WARN', cls:'tr-warn'});
     stepupReasons.push('high-risk country origin');
-  } else if (ctx.location === 'unknown') {
-    trace.push({ icon:'⚠️', text:'Unknown network — cannot verify IP reputation', result:'WARN', cls:'tr-warn' });
-    stepupReasons.push('unknown network origin');
+  } else if(ctx.location==='tor') {
+    trace.push({icon:'⚠️', text:'Tor detected — block policy disabled', result:'WARN', cls:'tr-warn'});
+  } else if(ctx.location==='unknown') {
+    trace.push({icon:'⚠️', text:'Unknown network — cannot verify IP reputation', result:'WARN', cls:'tr-warn'});
+    stepupReasons.push('unknown network');
   } else {
-    trace.push({ icon:'✅', text:`Network location verified — <strong>${ctx.location.replace('_',' ')}</strong>`, result:'PASS', cls:'tr-pass' });
+    trace.push({icon:'✅', text:`Network location — <strong>${ctx.location.replace('_',' ')}</strong>`, result:'PASS', cls:'tr-pass'});
   }
 
-  // 4. Device posture
-  if (isCritical && ctx.devMgmt === 'byod' && state.policies.require_mdm) {
-    trace.push({ icon:'❌', text:`<strong>BYOD blocked</strong> — CRITICAL resource requires MDM-managed device`, result:'BLOCKED', cls:'tr-fail' });
-    verdict = 'deny'; denyReasons.push('BYOD not permitted for critical resources');
-  } else if (isCritical && ctx.devMgmt === 'unknown' && state.policies.require_mdm) {
-    trace.push({ icon:'❌', text:'<strong>Unknown device</strong> — cannot verify device trust for CRITICAL resource', result:'BLOCKED', cls:'tr-fail' });
-    verdict = 'deny'; denyReasons.push('unknown device blocked on critical resource');
-  } else if (ctx.devPatch === 'critical') {
-    trace.push({ icon:'⚠️', text:'<strong>Critical OS patches missing</strong> — device compliance check failed', result:'WARN', cls:'tr-warn' });
-    stepupReasons.push('device missing critical patches');
-  } else if (ctx.devEdr === 'none' && isCritical) {
-    trace.push({ icon:'⚠️', text:'No EDR on endpoint — reduced confidence in device integrity', result:'WARN', cls:'tr-warn' });
+  // Device posture
+  if(isCritical && (ctx.devMgmt==='byod'||ctx.devMgmt==='unknown') && state.policies.require_mdm) {
+    trace.push({icon:'❌', text:`<strong>${ctx.devMgmt==='byod'?'BYOD':'Unknown device'}</strong> blocked — CRITICAL resource requires MDM-managed device`, result:'BLOCKED', cls:'tr-fail'});
+    verdict='deny'; denyReasons.push(`${ctx.devMgmt==='byod'?'BYOD':'unknown device'} on critical resource`);
+  } else if(ctx.devPatch==='critical') {
+    trace.push({icon:'⚠️', text:'<strong>Critical OS patches missing</strong> — device compliance failed', result:'WARN', cls:'tr-warn'});
+    stepupReasons.push('missing critical patches');
+  } else if(ctx.devEdr==='none' && isCritical) {
+    trace.push({icon:'⚠️', text:'No EDR on endpoint — reduced device integrity confidence', result:'WARN', cls:'tr-warn'});
     stepupReasons.push('no endpoint protection');
   } else {
-    trace.push({ icon:'✅', text:`Device posture verified — <strong>${ctx.devMgmt.replace('_',' ')}</strong>, EDR ${ctx.devEdr}`, result:'PASS', cls:'tr-pass' });
+    trace.push({icon:'✅', text:`Device posture — <strong>${ctx.devMgmt.replace('_',' ')}</strong>, EDR: ${ctx.devEdr}`, result:'PASS', cls:'tr-pass'});
   }
 
-  // 5. New device step-up
-  if (ctx.devSeen === 'new' && state.policies.stepup_new_device && verdict !== 'deny') {
-    trace.push({ icon:'🔐', text:'<strong>First-seen device</strong> — step-up authentication required before granting access', result:'STEP-UP', cls:'tr-warn' });
-    stepupReasons.push('new/unrecognised device');
-    if (verdict !== 'deny') verdict = 'stepup';
-  } else if (ctx.devSeen !== 'new') {
-    trace.push({ icon:'✅', text:'Device previously seen — no additional device verification needed', result:'PASS', cls:'tr-pass' });
+  // New device
+  if(ctx.devSeen==='new' && state.policies.stepup_new_device && verdict!=='deny') {
+    trace.push({icon:'🔐', text:'<strong>First-seen device</strong> — step-up required before access granted', result:'STEP-UP', cls:'tr-warn'});
+    stepupReasons.push('new device'); if(verdict!=='deny') verdict='stepup';
   }
 
-  // 6. After hours admin
-  if (ctx.role === 'admin' && ctx.time !== 'business' && state.policies.off_hours_alert && verdict !== 'deny') {
-    trace.push({ icon:'🕐', text:`<strong>Admin access outside business hours</strong> — ${ctx.time === 'after' ? 'after hours' : 'weekend'} requires confirmation`, result:'STEP-UP', cls:'tr-warn' });
-    stepupReasons.push('admin after-hours access');
-    if (verdict !== 'deny') verdict = 'stepup';
+  // After hours admin
+  if(ctx.role==='admin' && ctx.time!=='business' && state.policies.off_hours_admin && verdict!=='deny') {
+    trace.push({icon:'🕐', text:`<strong>Admin access ${ctx.time==='after'?'after hours':'on weekend'}</strong> — confirmation required`, result:'STEP-UP', cls:'tr-warn'});
+    stepupReasons.push('admin after-hours'); if(verdict!=='deny') verdict='stepup';
   }
 
-  // 7. Overall risk score
-  const riskScore = calcIdentityRisk();
-  if (riskScore >= 70 && verdict !== 'deny') {
-    trace.push({ icon:'🚨', text:`<strong>Identity risk score ${riskScore}/100</strong> — exceeds threshold (70) for automatic step-up`, result:'STEP-UP', cls:'tr-warn' });
-    if (verdict !== 'deny') verdict = 'stepup';
+  // Risk score
+  const riskScore = calcRisk();
+  if(riskScore>=70 && verdict!=='deny') {
+    trace.push({icon:'🚨', text:`<strong>Identity risk score ${riskScore}/100</strong> — exceeds threshold`, result:'STEP-UP', cls:'tr-warn'});
+    if(verdict!=='deny') verdict='stepup';
   } else {
-    trace.push({ icon:'✅', text:`Identity risk score: <strong>${riskScore}/100</strong> — within acceptable range`, result:'PASS', cls:'tr-pass' });
+    trace.push({icon:'✅', text:`Identity risk score: <strong>${riskScore}/100</strong>`, result:'PASS', cls:'tr-pass'});
   }
 
   renderDecision(verdict, trace, denyReasons, stepupReasons, ctx, resource);
-  if (state.orKey) fetchAIExplanation(verdict, denyReasons, stepupReasons, ctx, resource);
+  if(state.orKey) fetchAIExplanation(verdict, denyReasons, stepupReasons, ctx, resource);
 }
 
-function gatherContext() {
-  return {
-    user: document.getElementById('attr-user')?.value || 'unknown',
-    role: document.getElementById('attr-role')?.value,
-    mfa: document.getElementById('attr-mfa')?.value,
-    auth: document.getElementById('attr-auth')?.value,
-    location: document.getElementById('attr-location')?.value,
-    time: document.getElementById('attr-time')?.value,
-    devMgmt: document.getElementById('dev-mgmt')?.value,
-    devPatch: document.getElementById('dev-patch')?.value,
-    devEdr: document.getElementById('dev-edr')?.value,
-    devEncrypt: document.getElementById('dev-encrypt')?.value,
-    devBrowser: document.getElementById('dev-browser')?.value,
-    devSeen: document.getElementById('dev-seen')?.value,
-  };
-}
-
-// ── RENDER DECISION ───────────────────────────────────────────
 function renderDecision(verdict, trace, denyReasons, stepupReasons, ctx, resource) {
   const panel = document.getElementById('decision-panel');
-
-  const icons = { allow:'✅', deny:'🚫', stepup:'🔐' };
-  const verdicts = { allow:'ACCESS GRANTED', deny:'ACCESS DENIED', stepup:'STEP-UP REQUIRED' };
-  const subs = {
-    allow: `${ctx.user} may access ${resource?.name} — all policy checks passed`,
-    deny: `${ctx.user} blocked from ${resource?.name} — ${denyReasons[0] || 'policy violation'}`,
-    stepup: `${ctx.user} must complete additional verification — ${stepupReasons[0] || 'elevated risk'}`
+  const icons={allow:'✅',deny:'🚫',stepup:'🔐'};
+  const verdicts={allow:'ACCESS GRANTED',deny:'ACCESS DENIED',stepup:'STEP-UP REQUIRED'};
+  const subs={
+    allow:`${ctx.user} → ${resource?.name} — all checks passed${ctx.fromOkta?' (Okta SSO verified)':''}`,
+    deny:`${ctx.user} blocked from ${resource?.name} — ${denyReasons[0]||'policy violation'}`,
+    stepup:`${ctx.user} must verify — ${stepupReasons[0]||'elevated risk detected'}`
   };
+  const mitreTags=[];
+  if(ctx.auth==='stolen') { mitreTags.push('T1110.004 — Credential Stuffing','T1078 — Valid Accounts'); }
+  if(ctx.location==='tor') mitreTags.push('T1090 — Proxy');
+  if(ctx.devSeen==='new') mitreTags.push('T1563 — Remote Session Hijacking');
+  if(ctx.role==='admin'&&ctx.time!=='business') mitreTags.push('T1078.004 — Cloud Accounts');
 
-  const mitreTags = getMitreTags(verdict, ctx, denyReasons);
-
-  panel.className = `decision-panel ${verdict}`;
-  panel.innerHTML = `
+  panel.className=`decision-panel ${verdict}`;
+  panel.innerHTML=`
     <div class="decision-header">
       <div class="decision-icon">${icons[verdict]}</div>
       <div>
@@ -786,92 +865,60 @@ function renderDecision(verdict, trace, denyReasons, stepupReasons, ctx, resourc
       </div>
     </div>
     <div class="decision-body">
-      <div class="trace-list">
-        ${trace.map(t => `
-          <div class="trace-item">
-            <span class="trace-icon">${t.icon}</span>
-            <span class="trace-text">${t.text}</span>
-            <span class="trace-result ${t.cls}">${t.result}</span>
-          </div>
-        `).join('')}
+      <div>${trace.map(t=>`
+        <div class="trace-item">
+          <span class="trace-icon">${t.icon}</span>
+          <span class="trace-text">${t.text}</span>
+          <span class="trace-result ${t.cls}">${t.result}</span>
+        </div>`).join('')}
       </div>
-      ${mitreTags.length ? `
+      ${mitreTags.length?`
         <div style="margin-top:12px">
-          <div style="font-size:10px;color:var(--slate);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">MITRE ATT&CK relevance</div>
-          <div class="mitre-grid">${mitreTags.map(t => `<span class="mitre-tag">${t}</span>`).join('')}</div>
-        </div>
-      ` : ''}
-      <div class="ai-box" id="ai-box">
+          <div style="font-size:10px;color:var(--slate);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px">MITRE ATT&CK</div>
+          <div class="mitre-grid">${mitreTags.map(t=>`<span class="mitre-tag">${t}</span>`).join('')}</div>
+        </div>`:''}
+      <div class="ai-box">
         <div class="ai-header">
           <span class="ai-label">AI Explanation</span>
           <div class="ai-spinner" id="ai-spinner"></div>
         </div>
-        <div class="ai-text ${state.orKey ? 'loading' : ''}" id="ai-text">
-          ${state.orKey ? 'Generating plain-English explanation…' : 'Add your OpenRouter API key above to enable AI-powered plain-English explanations of this decision.'}
+        <div class="ai-text" id="ai-text">
+          ${state.orKey?'Generating explanation…':'Add OpenRouter API key above to enable plain-English explanations.'}
         </div>
       </div>
-    </div>
-  `;
-
-  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    </div>`;
+  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
-function getMitreTags(verdict, ctx, denyReasons) {
-  const tags = [];
-  if (ctx.auth === 'stolen') tags.push('T1110 — Brute Force', 'T1078 — Valid Accounts');
-  if (ctx.location === 'tor') tags.push('T1090 — Proxy');
-  if (ctx.devSeen === 'new') tags.push('T1563 — Remote Service Session Hijacking');
-  if (denyReasons.includes('credential stuffing pattern detected')) tags.push('T1110.004 — Credential Stuffing');
-  if (ctx.role === 'admin' && ctx.time !== 'business') tags.push('T1078.004 — Cloud Accounts');
-  return tags;
-}
-
-// ── AI EXPLANATION ────────────────────────────────────────────
 async function fetchAIExplanation(verdict, denyReasons, stepupReasons, ctx, resource) {
-  const spinner = document.getElementById('ai-spinner');
-  const aiText = document.getElementById('ai-text');
-  if (!spinner || !aiText) return;
-
+  const spinner=document.getElementById('ai-spinner');
+  const aiText=document.getElementById('ai-text');
+  if(!spinner||!aiText) return;
   spinner.classList.add('active');
-  aiText.className = 'ai-text loading';
-  aiText.textContent = 'Generating explanation…';
+  aiText.textContent='Generating explanation…';
+  const reasons=verdict==='deny'?denyReasons:stepupReasons;
+  const oktaCtx=ctx.fromOkta?`User authenticated via live Okta SSO. Groups: ${ctx.oktaGroups.join(', ')}.`:'';
+  const prompt=`You are a Zero Trust security expert explaining an access control decision to a non-technical security manager. Be concise and direct. 2-3 sentences maximum.
 
-  const verdictDesc = verdict === 'allow' ? 'ACCESS GRANTED' : verdict === 'deny' ? 'ACCESS DENIED' : 'STEP-UP AUTH REQUIRED';
-  const reasons = verdict === 'deny' ? denyReasons : stepupReasons;
-
-  const prompt = `You are a Zero Trust security expert explaining an access decision to a non-technical security manager. Be concise, direct, and use plain English. 2-3 sentences maximum.
-
-Access decision: ${verdictDesc}
-User: ${ctx.user} (role: ${ctx.role})
-Requesting: ${resource?.name} (sensitivity: ${resource?.sensitivity})
+Decision: ${verdict==='allow'?'ACCESS GRANTED':verdict==='deny'?'ACCESS DENIED':'STEP-UP AUTH REQUIRED'}
+User: ${ctx.user} (${ctx.role})
+Resource: ${resource?.name} (${resource?.sensitivity} sensitivity)
 Key signals: MFA=${ctx.mfa}, location=${ctx.location}, device=${ctx.devMgmt}, auth=${ctx.auth}
-${reasons.length ? 'Reasons: ' + reasons.join(', ') : ''}
+${oktaCtx}
+${reasons.length?'Reasons: '+reasons.join(', '):''}
 
-Explain WHY this decision was made and what the user/admin should do next. Start directly with the explanation, no preamble.`;
+Explain WHY and what should happen next. Be direct, no preamble.`;
 
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${state.orKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://ishwaryaunfiltered.live',
-        'X-Title': 'ZTNA Access Simulator'
-      },
-      body: JSON.stringify({
-        model: 'mistralai/mistral-7b-instruct:free',
-        max_tokens: 150,
-        temperature: 0.3,
-        messages: [{ role: 'user', content: prompt }]
-      })
+    const res=await fetch('https://openrouter.ai/api/v1/chat/completions',{
+      method:'POST',
+      headers:{'Authorization':`Bearer ${state.orKey}`,'Content-Type':'application/json','HTTP-Referer':'https://ishwaryaunfiltered.live','X-Title':'ZTNA Simulator'},
+      body:JSON.stringify({model:'mistralai/mistral-7b-instruct:free',max_tokens:150,temperature:0.3,messages:[{role:'user',content:prompt}]})
     });
-    const data = await res.json();
-    const text = data.choices?.[0]?.message?.content || 'Unable to generate explanation.';
-    aiText.className = 'ai-text';
-    aiText.textContent = text;
+    const data=await res.json();
+    aiText.textContent=data.choices?.[0]?.message?.content||'Unable to generate explanation.';
   } catch(e) {
-    aiText.className = 'ai-text';
-    aiText.textContent = 'AI explanation unavailable — check your OpenRouter API key.';
+    aiText.textContent='AI explanation unavailable — check OpenRouter key.';
   } finally {
     spinner.classList.remove('active');
   }
