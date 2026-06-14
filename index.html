@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zero Trust Access Simulator — ishwaryaunfiltered.live</title>
+  <meta name="description" content="Interactive Zero Trust Network Access policy simulator. Real-time identity, device, and resource policy evaluation with AI-powered decision explanations." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #0A0F1E;
+      --card:     #0D1B36;
+      --surface:  #112044;
+      --blue:     #3B82F6;
+      --blue-d:   #1E3A5F;
+      --green:    #10B981;
+      --amber:    #F59E0B;
+      --red:      #EF4444;
+      --purple:   #A78BFA;
+      --white:    #E2F0FF;
+      --slate:    #64748B;
+      --slate-l:  #94A3B8;
+      --mono:     'JetBrains Mono', monospace;
+      --sans:     'Inter', sans-serif;
+      --r:        8px;
+    }
+    html { scroll-behavior: smooth; }
+    body { background: var(--bg); color: var(--white); font-family: var(--sans); font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+
+    /* NAV */
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; border-bottom: 1px solid rgba(59,130,246,0.1); flex-wrap: wrap; gap: 10px; }
+    .nav-brand { font-family: var(--mono); font-size: 13px; color: var(--blue); font-weight: 600; text-decoration: none; }
+    .nav-title { font-size: 13px; color: var(--slate-l); }
+    .nav-links { display: flex; gap: 12px; }
+    .nav-links a { font-size: 12px; color: var(--slate); text-decoration: none; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--white); }
+
+    /* LAYOUT */
+    .page { max-width: 1200px; margin: 0 auto; padding: 2rem; display: grid; grid-template-columns: 300px 1fr; gap: 1.5rem; }
+    @media (max-width: 900px) { .page { grid-template-columns: 1fr; } }
+
+    /* PANEL BASE */
+    .panel { background: var(--card); border: 1px solid rgba(59,130,246,0.1); border-radius: var(--r); overflow: hidden; }
+    .panel-header { padding: 12px 16px; border-bottom: 1px solid rgba(59,130,246,0.08); display: flex; align-items: center; justify-content: space-between; }
+    .panel-title { font-family: var(--mono); font-size: 11px; color: var(--blue); text-transform: uppercase; letter-spacing: 0.1em; font-weight: 600; }
+    .panel-body { padding: 16px; }
+
+    /* SCENARIO CHIPS */
+    .scenario-chip { width: 100%; text-align: left; background: transparent; border: 1px solid rgba(59,130,246,0.1); border-radius: 6px; padding: 10px 12px; margin-bottom: 6px; cursor: pointer; transition: all 0.15s; color: var(--slate-l); font-family: var(--sans); font-size: 13px; display: flex; align-items: flex-start; gap: 10px; }
+    .scenario-chip:hover { border-color: rgba(59,130,246,0.35); color: var(--white); background: rgba(59,130,246,0.04); }
+    .scenario-chip.active { border-color: var(--blue); background: rgba(59,130,246,0.08); color: var(--white); }
+    .scenario-chip.active .chip-icon { opacity: 1; }
+    .chip-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; opacity: 0.7; }
+    .chip-label { font-size: 12px; font-weight: 500; color: inherit; line-height: 1.3; }
+    .chip-sub { font-size: 11px; color: var(--slate); margin-top: 2px; line-height: 1.3; }
+    .chip-badge { font-family: var(--mono); font-size: 9px; padding: 1px 5px; border-radius: 3px; margin-top: 4px; display: inline-block; }
+    .badge-attack { background: rgba(239,68,68,0.15); color: #FCA5A5; }
+    .badge-legit { background: rgba(16,185,129,0.15); color: #6EE7B7; }
+    .badge-edge { background: rgba(245,158,11,0.15); color: #FCD34D; }
+
+    /* RIGHT PANEL */
+    .right-col { display: flex; flex-direction: column; gap: 1.5rem; }
+
+    /* IDENTITY CARD */
+    .attr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .attr-group { display: flex; flex-direction: column; gap: 4px; }
+    .attr-label { font-size: 11px; color: var(--slate); font-family: var(--mono); text-transform: uppercase; letter-spacing: 0.06em; }
+    .attr-select, .attr-input {
+      background: var(--surface); border: 1px solid rgba(59,130,246,0.15);
+      border-radius: 6px; padding: 7px 10px; font-size: 13px; color: var(--white);
+      font-family: var(--sans); outline: none; width: 100%; transition: border-color 0.15s;
+      appearance: none;
+    }
+    .attr-select:focus, .attr-input:focus { border-color: var(--blue); }
+    .risk-bar-wrap { margin-top: 4px; }
+    .risk-bar { height: 4px; background: rgba(59,130,246,0.1); border-radius: 2px; overflow: hidden; }
+    .risk-fill { height: 100%; border-radius: 2px; transition: width 0.4s, background 0.4s; }
+    .risk-label { font-size: 11px; color: var(--slate-l); margin-top: 3px; font-family: var(--mono); }
+
+    /* RESOURCE CARD */
+    .resource-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .resource-btn { background: var(--surface); border: 1px solid rgba(59,130,246,0.12); border-radius: var(--r); padding: 10px; cursor: pointer; transition: all 0.15s; text-align: center; }
+    .resource-btn:hover { border-color: rgba(59,130,246,0.35); }
+    .resource-btn.selected { border-color: var(--blue); background: rgba(59,130,246,0.08); }
+    .resource-icon { font-size: 20px; margin-bottom: 4px; }
+    .resource-name { font-size: 12px; font-weight: 500; color: var(--white); }
+    .resource-sensitivity { font-size: 10px; font-family: var(--mono); margin-top: 2px; }
+    .sens-critical { color: #FCA5A5; }
+    .sens-high { color: #FCD34D; }
+    .sens-low { color: #6EE7B7; }
+
+    /* POLICY RULES */
+    .policy-list { display: flex; flex-direction: column; gap: 6px; }
+    .policy-rule { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; background: var(--surface); border: 1px solid rgba(59,130,246,0.08); }
+    .rule-toggle { width: 32px; height: 18px; border-radius: 9px; cursor: pointer; position: relative; transition: background 0.2s; flex-shrink: 0; border: none; }
+    .rule-toggle.on { background: var(--blue); }
+    .rule-toggle.off { background: var(--slate); }
+    .rule-toggle::after { content: ''; position: absolute; width: 12px; height: 12px; border-radius: 50%; background: white; top: 3px; transition: left 0.2s; }
+    .rule-toggle.on::after { left: 17px; }
+    .rule-toggle.off::after { left: 3px; }
+    .rule-text { font-size: 12px; color: var(--slate-l); flex: 1; }
+    .rule-text strong { color: var(--white); font-weight: 500; }
+
+    /* DECISION */
+    .decision-panel { border-radius: var(--r); overflow: hidden; transition: all 0.3s; }
+    .decision-header { padding: 20px 24px; display: flex; align-items: center; gap: 16px; }
+    .decision-icon { font-size: 36px; flex-shrink: 0; }
+    .decision-verdict { font-size: 22px; font-weight: 700; font-family: var(--mono); }
+    .decision-sub { font-size: 13px; margin-top: 2px; }
+    .decision-body { padding: 0 24px 20px; }
+
+    .decision-panel.allow { background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25); }
+    .decision-panel.allow .decision-verdict { color: var(--green); }
+    .decision-panel.allow .decision-sub { color: rgba(16,185,129,0.7); }
+
+    .decision-panel.deny { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); }
+    .decision-panel.deny .decision-verdict { color: var(--red); }
+    .decision-panel.deny .decision-sub { color: rgba(239,68,68,0.7); }
+
+    .decision-panel.stepup { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); }
+    .decision-panel.stepup .decision-verdict { color: var(--amber); }
+    .decision-panel.stepup .decision-sub { color: rgba(245,158,11,0.7); }
+
+    .decision-panel.idle { background: var(--card); border: 1px solid rgba(59,130,246,0.1); }
+    .decision-panel.idle .decision-verdict { color: var(--slate-l); }
+
+    /* EVALUATION TRACE */
+    .trace-list { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
+    .trace-item { display: flex; align-items: flex-start; gap: 10px; font-size: 12px; padding: 6px 0; border-bottom: 1px solid rgba(59,130,246,0.05); }
+    .trace-item:last-child { border-bottom: none; }
+    .trace-icon { flex-shrink: 0; font-size: 14px; margin-top: 1px; }
+    .trace-text { color: var(--slate-l); flex: 1; line-height: 1.5; }
+    .trace-text strong { color: var(--white); font-weight: 500; }
+    .trace-result { font-family: var(--mono); font-size: 10px; padding: 1px 6px; border-radius: 3px; flex-shrink: 0; }
+    .tr-pass { background: rgba(16,185,129,0.15); color: #6EE7B7; }
+    .tr-fail { background: rgba(239,68,68,0.15); color: #FCA5A5; }
+    .tr-warn { background: rgba(245,158,11,0.15); color: #FCD34D; }
+    .tr-info { background: rgba(59,130,246,0.15); color: #93C5FD; }
+
+    /* AI EXPLANATION */
+    .ai-box { margin-top: 16px; background: rgba(59,130,246,0.04); border: 1px solid rgba(59,130,246,0.12); border-radius: var(--r); padding: 14px 16px; }
+    .ai-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .ai-label { font-family: var(--mono); font-size: 10px; color: var(--blue); text-transform: uppercase; letter-spacing: 0.08em; }
+    .ai-spinner { width: 12px; height: 12px; border: 2px solid rgba(59,130,246,0.2); border-top-color: var(--blue); border-radius: 50%; animation: spin 0.8s linear infinite; display: none; }
+    .ai-spinner.active { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .ai-text { font-size: 13px; color: var(--slate-l); line-height: 1.7; }
+    .ai-text.loading { color: var(--slate); font-style: italic; }
+
+    /* MITRE */
+    .mitre-grid { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .mitre-tag { font-family: var(--mono); font-size: 10px; padding: 3px 8px; border-radius: 4px; background: rgba(167,139,250,0.1); color: #C4B5FD; border: 1px solid rgba(167,139,250,0.2); }
+
+    /* EVALUATE BTN */
+    .eval-btn { width: 100%; padding: 12px; background: var(--blue); border: none; border-radius: var(--r); color: white; font-size: 14px; font-weight: 600; font-family: var(--sans); cursor: pointer; transition: background 0.15s; margin-top: 4px; }
+    .eval-btn:hover { background: #2563EB; }
+    .eval-btn:active { transform: scale(0.99); }
+
+    /* OPENROUTER KEY */
+    .key-strip { background: var(--card); border: 1px solid rgba(59,130,246,0.1); border-radius: var(--r); padding: 12px 16px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .key-input { flex: 1; min-width: 200px; background: var(--surface); border: 1px solid rgba(59,130,246,0.15); border-radius: 6px; padding: 7px 10px; font-size: 12px; font-family: var(--mono); color: var(--white); outline: none; }
+    .key-input:focus { border-color: var(--blue); }
+    .key-label { font-size: 12px; color: var(--slate); }
+    .key-note { font-size: 11px; color: var(--slate); margin-top: 4px; width: 100%; }
+
+    /* FOOTER */
+    footer { text-align: center; padding: 2rem; font-family: var(--mono); font-size: 11px; color: var(--slate); border-top: 1px solid rgba(59,130,246,0.08); margin-top: 2rem; }
+    footer a { color: var(--blue); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a href="https://ishwaryaunfiltered.live" class="nav-brand">ishwarya@unfiltered:~$</a>
+  <span class="nav-title">Zero Trust Access Simulator</span>
+  <div class="nav-links">
+    <a href="https://ishwaryaunfiltered.live">Portfolio</a>
+    <a href="https://github.com/IshwaryaLakshmiC/ztna-simulator" target="_blank">GitHub</a>
+    <a href="https://ishwaryaunfiltered.live/ztna-scorer">ZTNA Scorer</a>
+  </div>
+</nav>
+
+<!-- OpenRouter key strip -->
+<div style="max-width:1200px;margin:1rem auto;padding:0 2rem;">
+  <div class="key-strip">
+    <span class="key-label">OpenRouter API key (optional — enables AI explanations):</span>
+    <input class="key-input" id="or-key" type="password" placeholder="sk-or-v1-..." oninput="saveKey()" />
+    <span class="key-note">Key stored in browser session only · Get a free key at openrouter.ai · Without a key, the policy engine still runs — only AI explanations are disabled</span>
+  </div>
+</div>
+
+<div class="page">
+
+  <!-- LEFT: Scenario library + controls -->
+  <div class="left-col">
+
+    <!-- Scenarios -->
+    <div class="panel" style="margin-bottom:1.5rem">
+      <div class="panel-header">
+        <span class="panel-title">// Scenario Library</span>
+      </div>
+      <div class="panel-body" style="padding:12px">
+        <div id="scenario-list"></div>
+      </div>
+    </div>
+
+    <!-- Policy Rules -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">// Active Policies</span>
+        <span style="font-size:11px;color:var(--slate)">toggle to test</span>
+      </div>
+      <div class="panel-body">
+        <div class="policy-list" id="policy-list"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: Identity + Resource + Decision -->
+  <div class="right-col">
+
+    <!-- Identity -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">// Identity Context</span>
+        <span style="font-size:11px;color:var(--slate)">who is requesting access</span>
+      </div>
+      <div class="panel-body">
+        <div class="attr-grid">
+          <div class="attr-group">
+            <span class="attr-label">User</span>
+            <input class="attr-input" id="attr-user" value="sarah.chen" />
+          </div>
+          <div class="attr-group">
+            <span class="attr-label">Role / Group</span>
+            <select class="attr-select" id="attr-role">
+              <option>engineer</option>
+              <option>admin</option>
+              <option>contractor</option>
+              <option>finance</option>
+              <option>executive</option>
+              <option>readonly</option>
+            </select>
+          </div>
+          <div class="attr-group">
+            <span class="attr-label">MFA Status</span>
+            <select class="attr-select" id="attr-mfa">
+              <option value="hardware">Hardware key (FIDO2)</option>
+              <option value="totp">TOTP app</option>
+              <option value="sms">SMS (weak)</option>
+              <option value="none">None enrolled</option>
+            </select>
+          </div>
+          <div class="attr-group">
+            <span class="attr-label">Auth Method</span>
+            <select class="attr-select" id="attr-auth">
+              <option value="sso_okta">SSO via Okta</option>
+              <option value="sso_azure">SSO via Azure AD</option>
+              <option value="local">Local credentials</option>
+              <option value="stolen">Credential stuffing</option>
+            </select>
+          </div>
+          <div class="attr-group">
+            <span class="attr-label">Location</span>
+            <select class="attr-select" id="attr-location">
+              <option value="corporate">Corporate office</option>
+              <option value="home">Home (known IP)</option>
+              <option value="unknown">Unknown network</option>
+              <option value="tor">Tor exit node</option>
+              <option value="highrisk">High-risk country</option>
+            </select>
+          </div>
+          <div class="attr-group">
+            <span class="attr-label">Time of Day</span>
+            <select class="attr-select" id="attr-time">
+              <option value="business">Business hours</option>
+              <option value="after">After hours</option>
+              <option value="weekend">Weekend</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Identity Risk Score -->
+        <div style="margin-top:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span class="attr-label">Identity Risk Score</span>
+            <span id="risk-val" style="font-family:var(--mono);font-size:12px;color:var(--white)">0</span>
+          </div>
+          <div class="risk-bar"><div class="risk-fill" id="risk-fill" style="width:0%"></div></div>
+          <div class="risk-label" id="risk-label">calculating…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Device Posture -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">// Device Posture</span>
+        <span style="font-size:11px;color:var(--slate)">endpoint trust signals</span>
+      </div>
+      <div class="panel-body">
+        <div class="attr-grid">
+          <div class="attr-group">
+            <span class="attr-label">Device Management</span>
+            <select class="attr-select" id="dev-mgmt">
+              <option value="mdm_managed">MDM managed (Jamf/Intune)</option>
+              <option value="corp_unmanaged">Corp-owned, unmanaged</option>
+              <option value="byod">BYOD</option>
+              <option value="unknown">Unknown device</option>
+            </select>
+          </div>
+          <div class="attr-group">
+            <span class="attr-label">OS Patch Status</span>
+            <select class="attr-select" id="dev-patch">
+              <option value="current">Current (< 30 days)</option>
+              <option value="stale">Stale (30-90 days)</option>
+              <option value="critical">Critical patches missing</option>
+            </select>
+          </div>
+          <div class="attr-group">
+            <span class="attr-label">EDR / Antivirus</span>
+            <select class="attr-select" id="dev-edr">
+              <option value="active">Active + healthy</option>
+              <option value="inactive">Installed but inactive</option>
+              <option value="none">Not installed</option>
+            </select>
+          </div>
+          <div class="attr-group">
+            <span class="attr-label">Disk Encryption</span>
+            <select class="attr-select" id="dev-encrypt">
+              <option value="yes">Enabled (FileVault/BitLocker)</option>
+              <option value="no">Not enabled</option>
+            </select>
+          </div>
+          <div class="attr-group">
+            <span class="attr-label">Browser / Client</span>
+            <select class="attr-select" id="dev-browser">
+              <option value="managed">Managed browser profile</option>
+              <option value="personal">Personal browser</option>
+              <option value="cli">CLI / API client</option>
+            </select>
+          </div>
+          <div class="attr-group">
+            <span class="attr-label">Last Seen</span>
+            <select class="attr-select" id="dev-seen">
+              <option value="now">Active session</option>
+              <option value="recent">< 24 hours</option>
+              <option value="stale">3-7 days</option>
+              <option value="new">First time (new device)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Resource -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">// Target Resource</span>
+        <span style="font-size:11px;color:var(--slate)">what they're trying to access</span>
+      </div>
+      <div class="panel-body">
+        <div class="resource-grid" id="resource-grid"></div>
+      </div>
+    </div>
+
+    <!-- Evaluate button -->
+    <button class="eval-btn" onclick="evaluate()">⚡ Evaluate Access Request</button>
+
+    <!-- Decision output -->
+    <div class="decision-panel idle" id="decision-panel">
+      <div class="decision-header">
+        <div class="decision-icon">🔒</div>
+        <div>
+          <div class="decision-verdict">AWAITING EVALUATION</div>
+          <div class="decision-sub" style="color:var(--slate-l)">Configure identity, device, and resource then click Evaluate</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+  Zero Trust Access Simulator · <a href="https://ishwaryaunfiltered.live">ishwaryaunfiltered.live</a> ·
+  <a href="https://github.com/IshwaryaLakshmiC/ztna-simulator" target="_blank">View on GitHub</a> ·
+  Built by <a href="https://linkedin.com/in/ishwaryachengalvarayan" target="_blank">Ishwarya Lakshmi C</a>
+</footer>
+
+<script>
+// ── DATA ─────────────────────────────────────────────────────
+
+const SCENARIOS = [
+  {
+    id: 'trusted_employee',
+    icon: '✅',
+    label: 'Trusted employee, managed device',
+    sub: 'Normal business access',
+    badge: 'legit',
+    attrs: { user:'sarah.chen', role:'engineer', mfa:'hardware', auth:'sso_okta', location:'corporate', time:'business' },
+    device: { mgmt:'mdm_managed', patch:'current', edr:'active', encrypt:'yes', browser:'managed', seen:'now' },
+    resource: 'internal_app',
+    expectedVerdict: 'allow'
+  },
+  {
+    id: 'stolen_creds',
+    icon: '🔴',
+    label: 'Stolen credentials + unknown device',
+    sub: 'Credential stuffing attack',
+    badge: 'attack',
+    attrs: { user:'admin.user', role:'admin', mfa:'none', auth:'stolen', location:'tor', time:'after' },
+    device: { mgmt:'unknown', patch:'critical', edr:'none', encrypt:'no', browser:'personal', seen:'new' },
+    resource: 'prod_database',
+    expectedVerdict: 'deny'
+  },
+  {
+    id: 'contractor_byod',
+    icon: '🟡',
+    label: 'Contractor on personal device',
+    sub: 'BYOD + limited access request',
+    badge: 'edge',
+    attrs: { user:'contractor.ext', role:'contractor', mfa:'totp', auth:'sso_okta', location:'home', time:'business' },
+    device: { mgmt:'byod', patch:'stale', edr:'inactive', encrypt:'no', browser:'personal', seen:'recent' },
+    resource: 'customer_data',
+    expectedVerdict: 'deny'
+  },
+  {
+    id: 'after_hours_admin',
+    icon: '🟠',
+    label: 'Admin access at 3am, new device',
+    sub: 'Unusual time + first-seen device',
+    badge: 'attack',
+    attrs: { user:'john.admin', role:'admin', mfa:'totp', auth:'sso_okta', location:'home', time:'after' },
+    device: { mgmt:'corp_unmanaged', patch:'current', edr:'active', encrypt:'yes', browser:'personal', seen:'new' },
+    resource: 'prod_database',
+    expectedVerdict: 'stepup'
+  },
+  {
+    id: 'executive_travel',
+    icon: '✈️',
+    label: 'Executive on travel, high-risk country',
+    sub: 'Legitimate but risky context',
+    badge: 'edge',
+    attrs: { user:'ceo.jane', role:'executive', mfa:'hardware', auth:'sso_okta', location:'highrisk', time:'business' },
+    device: { mgmt:'mdm_managed', patch:'current', edr:'active', encrypt:'yes', browser:'managed', seen:'recent' },
+    resource: 'internal_app',
+    expectedVerdict: 'stepup'
+  },
+  {
+    id: 'ci_pipeline',
+    icon: '🤖',
+    label: 'CI/CD service account, no MFA',
+    sub: 'Machine identity requesting S3',
+    badge: 'edge',
+    attrs: { user:'svc-ci-runner', role:'readonly', mfa:'none', auth:'local', location:'corporate', time:'business' },
+    device: { mgmt:'unknown', patch:'current', edr:'none', encrypt:'no', browser:'cli', seen:'now' },
+    resource: 's3_artifacts',
+    expectedVerdict: 'allow'
+  },
+];
+
+const RESOURCES = [
+  { id:'internal_app', icon:'🌐', name:'Internal App', sensitivity:'medium', label:'HIGH', cls:'sens-high' },
+  { id:'prod_database', icon:'🗄️', name:'Prod Database', sensitivity:'critical', label:'CRITICAL', cls:'sens-critical' },
+  { id:'customer_data', icon:'👥', name:'Customer Data', sensitivity:'critical', label:'CRITICAL', cls:'sens-critical' },
+  { id:'s3_artifacts', icon:'📦', name:'S3 Artifacts', sensitivity:'low', label:'LOW', cls:'sens-low' },
+  { id:'admin_console', icon:'⚙️', name:'Admin Console', sensitivity:'critical', label:'CRITICAL', cls:'sens-critical' },
+  { id:'logs_readonly', icon:'📋', name:'Logs (Read)', sensitivity:'low', label:'LOW', cls:'sens-low' },
+];
+
+const POLICIES = [
+  { id:'require_mfa', label:'Require MFA', desc:'Block access if no MFA enrolled', default:true },
+  { id:'block_tor', label:'Block Tor / anonymous proxies', desc:'Deny all Tor exit node traffic', default:true },
+  { id:'require_mdm', label:'Require managed device for critical resources', desc:'BYOD blocked from CRITICAL resources', default:true },
+  { id:'stepup_new_device', label:'Step-up auth on new device', desc:'Require additional verification on first-seen device', default:true },
+  { id:'block_highrisk_country', label:'Block high-risk countries', desc:'Deny access from sanctioned regions', default:false },
+  { id:'off_hours_alert', label:'Step-up for after-hours admin access', desc:'Admin access outside 8am-7pm requires confirmation', default:true },
+  { id:'block_weak_mfa', label:'Treat SMS MFA as insufficient for critical', desc:'SMS-only MFA denied on CRITICAL resources', default:true },
+];
+
+// State
+let state = {
+  selectedResource: 'internal_app',
+  policies: Object.fromEntries(POLICIES.map(p => [p.id, p.default])),
+  orKey: '',
+};
+
+// ── INIT ──────────────────────────────────────────────────────
+function init() {
+  renderScenarios();
+  renderResources();
+  renderPolicies();
+  updateRiskScore();
+  attachListeners();
+  const saved = sessionStorage.getItem('or_key');
+  if (saved) { document.getElementById('or-key').value = saved; state.orKey = saved; }
+}
+
+function saveKey() {
+  state.orKey = document.getElementById('or-key').value;
+  sessionStorage.setItem('or_key', state.orKey);
+}
+
+function attachListeners() {
+  document.querySelectorAll('.attr-select, .attr-input, [id^="dev-"]').forEach(el => {
+    el.addEventListener('change', updateRiskScore);
+    el.addEventListener('input', updateRiskScore);
+  });
+}
+
+// ── RENDER ────────────────────────────────────────────────────
+function renderScenarios() {
+  document.getElementById('scenario-list').innerHTML = SCENARIOS.map(s => `
+    <button class="scenario-chip" id="chip-${s.id}" onclick="loadScenario('${s.id}')">
+      <span class="chip-icon">${s.icon}</span>
+      <div>
+        <div class="chip-label">${s.label}</div>
+        <div class="chip-sub">${s.sub}</div>
+        <span class="chip-badge badge-${s.badge}">${s.badge.toUpperCase()}</span>
+      </div>
+    </button>
+  `).join('');
+}
+
+function renderResources() {
+  document.getElementById('resource-grid').innerHTML = RESOURCES.map(r => `
+    <button class="resource-btn ${r.id === state.selectedResource ? 'selected' : ''}"
+      onclick="selectResource('${r.id}')">
+      <div class="resource-icon">${r.icon}</div>
+      <div class="resource-name">${r.name}</div>
+      <div class="resource-sensitivity ${r.cls}">${r.label}</div>
+    </button>
+  `).join('');
+}
+
+function renderPolicies() {
+  document.getElementById('policy-list').innerHTML = POLICIES.map(p => `
+    <div class="policy-rule">
+      <button class="rule-toggle ${state.policies[p.id] ? 'on' : 'off'}"
+        onclick="togglePolicy('${p.id}')"></button>
+      <div class="rule-text"><strong>${p.label}</strong><br>${p.desc}</div>
+    </div>
+  `).join('');
+}
+
+function selectResource(id) {
+  state.selectedResource = id;
+  renderResources();
+}
+
+function togglePolicy(id) {
+  state.policies[id] = !state.policies[id];
+  renderPolicies();
+}
+
+function loadScenario(id) {
+  const s = SCENARIOS.find(x => x.id === id);
+  if (!s) return;
+  document.querySelectorAll('.scenario-chip').forEach(c => c.classList.remove('active'));
+  document.getElementById(`chip-${id}`)?.classList.add('active');
+  // Set identity attrs
+  document.getElementById('attr-user').value = s.attrs.user;
+  setSelect('attr-role', s.attrs.role);
+  setSelect('attr-mfa', s.attrs.mfa);
+  setSelect('attr-auth', s.attrs.auth);
+  setSelect('attr-location', s.attrs.location);
+  setSelect('attr-time', s.attrs.time);
+  // Set device
+  setSelect('dev-mgmt', s.device.mgmt);
+  setSelect('dev-patch', s.device.patch);
+  setSelect('dev-edr', s.device.edr);
+  setSelect('dev-encrypt', s.device.encrypt);
+  setSelect('dev-browser', s.device.browser);
+  setSelect('dev-seen', s.device.seen);
+  // Set resource
+  selectResource(s.resource);
+  updateRiskScore();
+  // Auto-evaluate
+  setTimeout(evaluate, 300);
+}
+
+function setSelect(id, value) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  for (let opt of el.options) {
+    if (opt.value === value) { el.value = value; return; }
+  }
+}
+
+// ── RISK SCORE ────────────────────────────────────────────────
+function calcIdentityRisk() {
+  let score = 0;
+  const mfa = document.getElementById('attr-mfa')?.value;
+  const auth = document.getElementById('attr-auth')?.value;
+  const loc = document.getElementById('attr-location')?.value;
+  const time = document.getElementById('attr-time')?.value;
+  const seen = document.getElementById('dev-seen')?.value;
+
+  if (mfa === 'none') score += 30;
+  else if (mfa === 'sms') score += 15;
+  else if (mfa === 'totp') score += 5;
+
+  if (auth === 'stolen') score += 40;
+  else if (auth === 'local') score += 10;
+
+  if (loc === 'tor') score += 30;
+  else if (loc === 'highrisk') score += 20;
+  else if (loc === 'unknown') score += 10;
+
+  if (time === 'after') score += 10;
+  else if (time === 'weekend') score += 5;
+
+  if (seen === 'new') score += 15;
+
+  const mgmt = document.getElementById('dev-mgmt')?.value;
+  const patch = document.getElementById('dev-patch')?.value;
+  const edr = document.getElementById('dev-edr')?.value;
+
+  if (mgmt === 'unknown') score += 15;
+  else if (mgmt === 'byod') score += 10;
+
+  if (patch === 'critical') score += 15;
+  else if (patch === 'stale') score += 5;
+
+  if (edr === 'none') score += 10;
+  else if (edr === 'inactive') score += 5;
+
+  return Math.min(100, score);
+}
+
+function updateRiskScore() {
+  const score = calcIdentityRisk();
+  const fill = document.getElementById('risk-fill');
+  const val = document.getElementById('risk-val');
+  const label = document.getElementById('risk-label');
+  if (!fill) return;
+
+  fill.style.width = score + '%';
+  val.textContent = score;
+
+  if (score >= 70) { fill.style.background = '#EF4444'; label.textContent = 'HIGH RISK — multiple trust signals failed'; label.style.color = '#FCA5A5'; }
+  else if (score >= 40) { fill.style.background = '#F59E0B'; label.textContent = 'ELEVATED — some trust signals degraded'; label.style.color = '#FCD34D'; }
+  else if (score >= 20) { fill.style.background = '#3B82F6'; label.textContent = 'MODERATE — minor risk factors present'; label.style.color = '#93C5FD'; }
+  else { fill.style.background = '#10B981'; label.textContent = 'LOW — strong trust posture'; label.style.color = '#6EE7B7'; }
+}
+
+// ── POLICY ENGINE ─────────────────────────────────────────────
+function evaluate() {
+  const ctx = gatherContext();
+  const trace = [];
+  let verdict = 'allow';
+  let denyReasons = [];
+  let stepupReasons = [];
+
+  const resource = RESOURCES.find(r => r.id === state.selectedResource);
+  const isCritical = resource?.sensitivity === 'critical';
+
+  // 1. MFA check
+  if (state.policies.require_mfa && ctx.mfa === 'none') {
+    trace.push({ icon:'❌', text:'<strong>MFA Required</strong> — user has no MFA enrolled', result:'BLOCKED', cls:'tr-fail' });
+    verdict = 'deny'; denyReasons.push('no MFA enrolled');
+  } else if (ctx.mfa === 'none') {
+    trace.push({ icon:'⚠️', text:'No MFA enrolled (policy disabled — would normally block)', result:'SKIPPED', cls:'tr-warn' });
+  } else if (ctx.mfa === 'sms' && isCritical && state.policies.block_weak_mfa) {
+    trace.push({ icon:'❌', text:`<strong>Weak MFA (SMS)</strong> — insufficient for ${resource.name} (CRITICAL resource)`, result:'BLOCKED', cls:'tr-fail' });
+    verdict = 'deny'; denyReasons.push('SMS MFA insufficient for critical resource');
+  } else {
+    trace.push({ icon:'✅', text:`MFA verified — <strong>${ctx.mfa.replace('_',' ')}</strong>`, result:'PASS', cls:'tr-pass' });
+  }
+
+  // 2. Auth method
+  if (ctx.auth === 'stolen') {
+    trace.push({ icon:'🚨', text:'<strong>Credential stuffing detected</strong> — auth pattern matches known attack signatures', result:'BLOCKED', cls:'tr-fail' });
+    verdict = 'deny'; denyReasons.push('credential stuffing pattern detected');
+  } else if (ctx.auth === 'local') {
+    trace.push({ icon:'⚠️', text:'Local credentials used — SSO not enforced', result:'WARN', cls:'tr-warn' });
+    if (isCritical) { stepupReasons.push('local auth on critical resource'); }
+  } else {
+    trace.push({ icon:'✅', text:`SSO verified — <strong>${ctx.auth.replace('sso_','').toUpperCase()}</strong>`, result:'PASS', cls:'tr-pass' });
+  }
+
+  // 3. Network / location
+  if (ctx.location === 'tor' && state.policies.block_tor) {
+    trace.push({ icon:'❌', text:'<strong>Tor exit node detected</strong> — anonymous network blocked by policy', result:'BLOCKED', cls:'tr-fail' });
+    verdict = 'deny'; denyReasons.push('Tor exit node blocked');
+  } else if (ctx.location === 'highrisk' && state.policies.block_highrisk_country) {
+    trace.push({ icon:'❌', text:'<strong>High-risk country</strong> — geo-block policy active', result:'BLOCKED', cls:'tr-fail' });
+    verdict = 'deny'; denyReasons.push('high-risk country blocked');
+  } else if (ctx.location === 'highrisk') {
+    trace.push({ icon:'⚠️', text:'High-risk country — policy disabled, but risk score elevated', result:'WARN', cls:'tr-warn' });
+    stepupReasons.push('high-risk country origin');
+  } else if (ctx.location === 'unknown') {
+    trace.push({ icon:'⚠️', text:'Unknown network — cannot verify IP reputation', result:'WARN', cls:'tr-warn' });
+    stepupReasons.push('unknown network origin');
+  } else {
+    trace.push({ icon:'✅', text:`Network location verified — <strong>${ctx.location.replace('_',' ')}</strong>`, result:'PASS', cls:'tr-pass' });
+  }
+
+  // 4. Device posture
+  if (isCritical && ctx.devMgmt === 'byod' && state.policies.require_mdm) {
+    trace.push({ icon:'❌', text:`<strong>BYOD blocked</strong> — CRITICAL resource requires MDM-managed device`, result:'BLOCKED', cls:'tr-fail' });
+    verdict = 'deny'; denyReasons.push('BYOD not permitted for critical resources');
+  } else if (isCritical && ctx.devMgmt === 'unknown' && state.policies.require_mdm) {
+    trace.push({ icon:'❌', text:'<strong>Unknown device</strong> — cannot verify device trust for CRITICAL resource', result:'BLOCKED', cls:'tr-fail' });
+    verdict = 'deny'; denyReasons.push('unknown device blocked on critical resource');
+  } else if (ctx.devPatch === 'critical') {
+    trace.push({ icon:'⚠️', text:'<strong>Critical OS patches missing</strong> — device compliance check failed', result:'WARN', cls:'tr-warn' });
+    stepupReasons.push('device missing critical patches');
+  } else if (ctx.devEdr === 'none' && isCritical) {
+    trace.push({ icon:'⚠️', text:'No EDR on endpoint — reduced confidence in device integrity', result:'WARN', cls:'tr-warn' });
+    stepupReasons.push('no endpoint protection');
+  } else {
+    trace.push({ icon:'✅', text:`Device posture verified — <strong>${ctx.devMgmt.replace('_',' ')}</strong>, EDR ${ctx.devEdr}`, result:'PASS', cls:'tr-pass' });
+  }
+
+  // 5. New device step-up
+  if (ctx.devSeen === 'new' && state.policies.stepup_new_device && verdict !== 'deny') {
+    trace.push({ icon:'🔐', text:'<strong>First-seen device</strong> — step-up authentication required before granting access', result:'STEP-UP', cls:'tr-warn' });
+    stepupReasons.push('new/unrecognised device');
+    if (verdict !== 'deny') verdict = 'stepup';
+  } else if (ctx.devSeen !== 'new') {
+    trace.push({ icon:'✅', text:'Device previously seen — no additional device verification needed', result:'PASS', cls:'tr-pass' });
+  }
+
+  // 6. After hours admin
+  if (ctx.role === 'admin' && ctx.time !== 'business' && state.policies.off_hours_alert && verdict !== 'deny') {
+    trace.push({ icon:'🕐', text:`<strong>Admin access outside business hours</strong> — ${ctx.time === 'after' ? 'after hours' : 'weekend'} requires confirmation`, result:'STEP-UP', cls:'tr-warn' });
+    stepupReasons.push('admin after-hours access');
+    if (verdict !== 'deny') verdict = 'stepup';
+  }
+
+  // 7. Overall risk score
+  const riskScore = calcIdentityRisk();
+  if (riskScore >= 70 && verdict !== 'deny') {
+    trace.push({ icon:'🚨', text:`<strong>Identity risk score ${riskScore}/100</strong> — exceeds threshold (70) for automatic step-up`, result:'STEP-UP', cls:'tr-warn' });
+    if (verdict !== 'deny') verdict = 'stepup';
+  } else {
+    trace.push({ icon:'✅', text:`Identity risk score: <strong>${riskScore}/100</strong> — within acceptable range`, result:'PASS', cls:'tr-pass' });
+  }
+
+  renderDecision(verdict, trace, denyReasons, stepupReasons, ctx, resource);
+  if (state.orKey) fetchAIExplanation(verdict, denyReasons, stepupReasons, ctx, resource);
+}
+
+function gatherContext() {
+  return {
+    user: document.getElementById('attr-user')?.value || 'unknown',
+    role: document.getElementById('attr-role')?.value,
+    mfa: document.getElementById('attr-mfa')?.value,
+    auth: document.getElementById('attr-auth')?.value,
+    location: document.getElementById('attr-location')?.value,
+    time: document.getElementById('attr-time')?.value,
+    devMgmt: document.getElementById('dev-mgmt')?.value,
+    devPatch: document.getElementById('dev-patch')?.value,
+    devEdr: document.getElementById('dev-edr')?.value,
+    devEncrypt: document.getElementById('dev-encrypt')?.value,
+    devBrowser: document.getElementById('dev-browser')?.value,
+    devSeen: document.getElementById('dev-seen')?.value,
+  };
+}
+
+// ── RENDER DECISION ───────────────────────────────────────────
+function renderDecision(verdict, trace, denyReasons, stepupReasons, ctx, resource) {
+  const panel = document.getElementById('decision-panel');
+
+  const icons = { allow:'✅', deny:'🚫', stepup:'🔐' };
+  const verdicts = { allow:'ACCESS GRANTED', deny:'ACCESS DENIED', stepup:'STEP-UP REQUIRED' };
+  const subs = {
+    allow: `${ctx.user} may access ${resource?.name} — all policy checks passed`,
+    deny: `${ctx.user} blocked from ${resource?.name} — ${denyReasons[0] || 'policy violation'}`,
+    stepup: `${ctx.user} must complete additional verification — ${stepupReasons[0] || 'elevated risk'}`
+  };
+
+  const mitreTags = getMitreTags(verdict, ctx, denyReasons);
+
+  panel.className = `decision-panel ${verdict}`;
+  panel.innerHTML = `
+    <div class="decision-header">
+      <div class="decision-icon">${icons[verdict]}</div>
+      <div>
+        <div class="decision-verdict">${verdicts[verdict]}</div>
+        <div class="decision-sub">${subs[verdict]}</div>
+      </div>
+    </div>
+    <div class="decision-body">
+      <div class="trace-list">
+        ${trace.map(t => `
+          <div class="trace-item">
+            <span class="trace-icon">${t.icon}</span>
+            <span class="trace-text">${t.text}</span>
+            <span class="trace-result ${t.cls}">${t.result}</span>
+          </div>
+        `).join('')}
+      </div>
+      ${mitreTags.length ? `
+        <div style="margin-top:12px">
+          <div style="font-size:10px;color:var(--slate);font-family:var(--mono);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px">MITRE ATT&CK relevance</div>
+          <div class="mitre-grid">${mitreTags.map(t => `<span class="mitre-tag">${t}</span>`).join('')}</div>
+        </div>
+      ` : ''}
+      <div class="ai-box" id="ai-box">
+        <div class="ai-header">
+          <span class="ai-label">AI Explanation</span>
+          <div class="ai-spinner" id="ai-spinner"></div>
+        </div>
+        <div class="ai-text ${state.orKey ? 'loading' : ''}" id="ai-text">
+          ${state.orKey ? 'Generating plain-English explanation…' : 'Add your OpenRouter API key above to enable AI-powered plain-English explanations of this decision.'}
+        </div>
+      </div>
+    </div>
+  `;
+
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function getMitreTags(verdict, ctx, denyReasons) {
+  const tags = [];
+  if (ctx.auth === 'stolen') tags.push('T1110 — Brute Force', 'T1078 — Valid Accounts');
+  if (ctx.location === 'tor') tags.push('T1090 — Proxy');
+  if (ctx.devSeen === 'new') tags.push('T1563 — Remote Service Session Hijacking');
+  if (denyReasons.includes('credential stuffing pattern detected')) tags.push('T1110.004 — Credential Stuffing');
+  if (ctx.role === 'admin' && ctx.time !== 'business') tags.push('T1078.004 — Cloud Accounts');
+  return tags;
+}
+
+// ── AI EXPLANATION ────────────────────────────────────────────
+async function fetchAIExplanation(verdict, denyReasons, stepupReasons, ctx, resource) {
+  const spinner = document.getElementById('ai-spinner');
+  const aiText = document.getElementById('ai-text');
+  if (!spinner || !aiText) return;
+
+  spinner.classList.add('active');
+  aiText.className = 'ai-text loading';
+  aiText.textContent = 'Generating explanation…';
+
+  const verdictDesc = verdict === 'allow' ? 'ACCESS GRANTED' : verdict === 'deny' ? 'ACCESS DENIED' : 'STEP-UP AUTH REQUIRED';
+  const reasons = verdict === 'deny' ? denyReasons : stepupReasons;
+
+  const prompt = `You are a Zero Trust security expert explaining an access decision to a non-technical security manager. Be concise, direct, and use plain English. 2-3 sentences maximum.
+
+Access decision: ${verdictDesc}
+User: ${ctx.user} (role: ${ctx.role})
+Requesting: ${resource?.name} (sensitivity: ${resource?.sensitivity})
+Key signals: MFA=${ctx.mfa}, location=${ctx.location}, device=${ctx.devMgmt}, auth=${ctx.auth}
+${reasons.length ? 'Reasons: ' + reasons.join(', ') : ''}
+
+Explain WHY this decision was made and what the user/admin should do next. Start directly with the explanation, no preamble.`;
+
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${state.orKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://ishwaryaunfiltered.live',
+        'X-Title': 'ZTNA Access Simulator'
+      },
+      body: JSON.stringify({
+        model: 'mistralai/mistral-7b-instruct:free',
+        max_tokens: 150,
+        temperature: 0.3,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await res.json();
+    const text = data.choices?.[0]?.message?.content || 'Unable to generate explanation.';
+    aiText.className = 'ai-text';
+    aiText.textContent = text;
+  } catch(e) {
+    aiText.className = 'ai-text';
+    aiText.textContent = 'AI explanation unavailable — check your OpenRouter API key.';
+  } finally {
+    spinner.classList.remove('active');
+  }
+}
+
+init();
+</script>
+</body>
+</html>
