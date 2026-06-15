@@ -771,10 +771,23 @@ function signInWithOkta() {
   });
 }
 
+function switchOktaUser() {
+  if (!oktaAuth) return;
+  // Clear local tokens only — keeps Okta org session intact for other users
+  // prompt=login forces Okta to show the login screen regardless of session
+  oktaAuth.tokenManager.clear();
+  oktaUser = null;
+  oktaAuth.signInWithRedirect({
+    originalUri: getRedirectUri(),
+    prompt: 'login'
+  });
+}
+
 function signOutOkta() {
   if (!oktaAuth) return;
   localStorage.removeItem('okta_domain');
   localStorage.removeItem('okta_client_id');
+  localStorage.removeItem('okta_issuer_type');
   oktaAuth.signOut({ postLogoutRedirectUri: getRedirectUri() });
 }
 
@@ -838,7 +851,6 @@ function showOktaIdentity() {
                   : amr.includes('sms') ? 'SMS'
                   : 'password only';
 
-  // Debug: show if groups claim is missing
   const groupsWarning = groups.length === 0
     ? `<span style="color:#FCD34D;font-size:10px;font-family:var(--mono)">⚠ No groups — check Okta groups claim config</span>`
     : groups.map(g=>`<span class="id-group-tag">${g}</span>`).join('');
@@ -856,6 +868,7 @@ function showOktaIdentity() {
         </div>
       </div>
       <div class="id-actions">
+        <button class="btn btn-ghost" onclick="switchOktaUser()" style="font-size:11px;padding:5px 10px" title="Sign in as a different Okta user">Switch user</button>
         <button class="btn btn-ghost" onclick="debugOktaClaims()" style="font-size:11px;padding:5px 10px">Debug claims</button>
         <button class="btn btn-ghost" onclick="signOutOkta()" style="font-size:12px;padding:6px 12px">Sign out</button>
       </div>
@@ -865,7 +878,8 @@ function showOktaIdentity() {
   document.getElementById('identity-source-badge').className = 'source-tag source-okta';
   document.getElementById('identity-source-badge').textContent = '✓ live okta';
   document.getElementById('nav-auth-area').innerHTML =
-    `<span style="font-family:var(--mono);font-size:11px;color:#6EE7B7">● ${oktaUser.email}</span>`;
+    `<span style="font-family:var(--mono);font-size:11px;color:#6EE7B7">● ${oktaUser.email}</span>
+     <button onclick="switchOktaUser()" style="font-family:var(--mono);font-size:10px;color:var(--slate);background:none;border:none;cursor:pointer;margin-left:8px;padding:0">switch user</button>`;
 }
 
 function debugOktaClaims() {
