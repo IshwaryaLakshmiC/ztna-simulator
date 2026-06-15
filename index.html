@@ -287,13 +287,22 @@
     <div class="okta-config-grid">
       <div class="cfg-group">
         <span class="cfg-label">Okta Domain</span>
-        <input class="cfg-input" id="okta-domain" placeholder="dev-12345678.okta.com" />
+        <input class="cfg-input" id="okta-domain" placeholder="integrator-1234567.okta.com (no https://)" />
       </div>
       <div class="cfg-group">
         <span class="cfg-label">Client ID</span>
         <input class="cfg-input" id="okta-client-id" placeholder="0oa1b2c3d4e5f6g7h8i9" />
       </div>
       <button class="btn btn-primary" onclick="initOkta()">Connect + Sign In</button>
+    </div>
+    <div style="margin-top:8px">
+      <div class="cfg-group">
+        <span class="cfg-label">Authorization Server &nbsp;<span style="color:var(--slate);font-weight:300;font-size:10px">— if you get a 400 error, switch to Org AS</span></span>
+        <select class="cfg-input" id="okta-issuer-type" style="cursor:pointer">
+          <option value="custom">Custom AS — /oauth2/default (standard developer accounts)</option>
+          <option value="org">Org AS — no path (integrator / workforce tenants)</option>
+        </select>
+      </div>
     </div>
     <div style="margin-top:10px;padding:8px 10px;background:rgba(59,130,246,0.05);border-radius:6px;border:1px solid rgba(59,130,246,0.12)">
       <p style="font-family:var(--mono);font-size:10px;color:var(--slate-l);margin-bottom:3px">Add this exact URI to your Okta app → Sign-in redirect URIs:</p>
@@ -620,7 +629,7 @@
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────
-let OKTA_DOMAIN    = localStorage.getItem('okta_domain')    || '';
+let OKTA_DOMAIN    = (localStorage.getItem('okta_domain')    || '').replace(/^https?:\/\//i, '').replace(/\/+$/, '');
 let OKTA_CLIENT_ID = localStorage.getItem('okta_client_id') || '';
 let oktaAuth = null;
 let oktaUser = null;
@@ -653,8 +662,14 @@ function initOkta() {
     return;
   }
 
-  const domain   = document.getElementById('okta-domain').value.trim();
+  let domain = document.getElementById('okta-domain').value.trim();
   const clientId = document.getElementById('okta-client-id').value.trim();
+
+  // Strip protocol prefix if user pasted the full URL
+  domain = domain.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+
+  // Update the field so user sees the cleaned value
+  document.getElementById('okta-domain').value = domain;
 
   if (!domain || !clientId) {
     alert('Enter both Okta Domain and Client ID');
@@ -667,16 +682,26 @@ function initOkta() {
   OKTA_CLIENT_ID = clientId;
   localStorage.setItem('okta_domain',    domain);
   localStorage.setItem('okta_client_id', clientId);
+  // Save issuer type selection
+  const issuerType = document.getElementById('okta-issuer-type')?.value || 'custom';
+  localStorage.setItem('okta_issuer_type', issuerType);
 
   setupOktaAuth(domain, clientId, /* triggerSignIn= */ true);
 }
 
 function setupOktaAuth(domain, clientId, triggerSignIn = false) {
-  console.log('setupOktaAuth:', { domain, clientId, triggerSignIn, redirectUri: getRedirectUri() });
+  // Build issuer based on selected authorization server type
+  // integrator- tenants often only have Org AS (no /oauth2/default path)
+  const issuerType = document.getElementById('okta-issuer-type')?.value || 'custom';
+  const issuer = issuerType === 'org'
+    ? `https://${domain}`
+    : `https://${domain}/oauth2/default`;
+
+  console.log('setupOktaAuth:', { domain, clientId, triggerSignIn, issuer, redirectUri: getRedirectUri() });
 
   try {
     oktaAuth = new OktaAuth({
-      issuer:      `https://${domain}/oauth2/default`,
+      issuer:      issuer,
       clientId:    clientId,
       redirectUri: getRedirectUri(),
       scopes:      ['openid', 'profile', 'email'],
@@ -978,6 +1003,11 @@ function init() {
   // Pre-fill saved config values into the form
   if (OKTA_DOMAIN)    document.getElementById('okta-domain').value    = OKTA_DOMAIN;
   if (OKTA_CLIENT_ID) document.getElementById('okta-client-id').value = OKTA_CLIENT_ID;
+  const savedIssuerType = localStorage.getItem('okta_issuer_type');
+  if (savedIssuerType) {
+    const sel = document.getElementById('okta-issuer-type');
+    if (sel) sel.value = savedIssuerType;
+  }
 
   // Auto-init Okta on page load if:
   // a) We have saved config (returning user), OR
