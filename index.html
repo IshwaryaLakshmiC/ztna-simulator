@@ -743,26 +743,21 @@ function setupOktaAuth(domain, clientId, triggerSignIn = false) {
 
 async function handleOktaCallback() {
   try {
-    // Parse the code from the URL and exchange it for tokens
-    await oktaAuth.handleRedirectCallback();
+    // okta-auth-js v7: handleRedirectCallback was renamed to handleLoginRedirect
+    await oktaAuth.handleLoginRedirect();
     // Clean up the URL — remove ?code=&state= from browser history
     window.history.replaceState({}, document.title, getRedirectUri());
     await loadOktaUser();
   } catch (err) {
     console.error('Okta callback error:', err);
-    // Common causes:
-    // 1. redirectUri mismatch — URL in Okta app != getRedirectUri()
-    // 2. PKCE code_verifier lost — happens if sessionStorage was used
-    // 3. State mismatch — user opened two tabs during auth
     const msg = err.message || String(err);
     if (msg.includes('state')) {
-      showOktaError('State mismatch — you may have opened multiple tabs. Try again.');
+      showOktaError('State mismatch — try again in a fresh tab.');
     } else if (msg.includes('redirect_uri')) {
-      showOktaError(`Redirect URI mismatch. Add this exact URI to your Okta app: ${getRedirectUri()}`);
+      showOktaError(`Redirect URI mismatch. Add this to your Okta app: ${getRedirectUri()}`);
     } else {
-      showOktaError(`Callback failed: ${msg}. Check browser console for details.`);
+      showOktaError(`Callback failed: ${msg}. Check browser console.`);
     }
-    // Clear bad tokens so the user can retry
     await oktaAuth.tokenManager.clear();
   }
 }
