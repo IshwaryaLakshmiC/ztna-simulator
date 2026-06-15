@@ -802,17 +802,19 @@ async function loadOktaUser() {
     }
 
     const claims = idToken.claims;
+    console.log('=== RAW ID TOKEN CLAIMS ===', JSON.stringify(claims, null, 2));
 
-    // ── Groups extraction ──────────────────────────────────────
-    // groups claim is a CUSTOM claim configured in Okta Authorization Server
-    // under Security → API → Authorization Servers → default → Claims
-    // Name: "groups", Include in: ID Token, Value type: Groups, Filter: .*
-    // It will appear as claims.groups = ["engineers", "admins", "Everyone"]
-    // If this is undefined, the custom claim is not configured correctly.
-    const rawGroups = claims.groups || [];
+    // Groups extraction — defensive handling of all possible formats
+    // Okta may return: claims.groups, claims.group, or nothing
+    // Filter out built-in Okta groups that aren't useful for policy decisions
+    const SYSTEM_GROUPS = ['everyone', 'all users', 'all okta users'];
+    let rawGroups = claims.groups || claims.group || [];
+    if (typeof rawGroups === 'string') rawGroups = [rawGroups]; // handle single string
     const filteredGroups = rawGroups.filter(g =>
-      !['everyone', 'all users', 'all okta users'].includes(g.toLowerCase())
+      !SYSTEM_GROUPS.includes(g.toLowerCase())
     );
+
+    console.log('Groups from token:', rawGroups, '→ filtered:', filteredGroups);
 
     // ── AMR (Authentication Method Reference) ─────────────────
     // amr tells us HOW the user authenticated — which MFA method they used.
@@ -883,17 +885,14 @@ function showOktaIdentity() {
 }
 
 function debugOktaClaims() {
-  // Shows raw ID token claims — useful for verifying groups claim is present
   const claims = oktaUser?._claims || {};
-  const msg = Object.entries(claims)
-    .map(([k,v]) => `${k}: ${JSON.stringify(v)}`)
-    .join('\n');
-  alert(`ID Token Claims:\n\n${msg}\n\n` +
-    (claims.groups
-      ? `✓ groups claim present: ${JSON.stringify(claims.groups)}`
-      : `⚠ groups claim MISSING — configure it in:\nOkta Admin → Security → API → Authorization Servers → default → Claims → Add Claim\nName: groups | ID Token | Groups | Matches regex: .*`
-    )
-  );
+  const lines = Object.entries(claims).map(([k,v]) => `${k}: ${JSON.stringify(v)}`);
+  const groupsStatus = claims.groups
+    ? `✓ groups present: ${JSON.stringify(claims.groups)}`
+    : claims.group
+      ? `✓ group (singular) present: ${JSON.stringify(claims.group)}`
+      : `✗ NO groups claim found in ID token\n\nTo fix:\n1. Okta Admin → Security → API → Authorization Servers → default\n2. Claims tab → find "groups" claim → click Edit\n3. Verify: Include in token type = "ID Token"\n4. Verify: Include in = "Any scope"\n5. Save → then sign out and sign back in`;
+  alert(`ID Token Claims:\n\n${lines.join('\n')}\n\n─────────────────────\n${groupsStatus}`);
 }
 
 function applyOktaToForm() {
