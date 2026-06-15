@@ -615,7 +615,13 @@ let demoMode = false;
 // Use origin only (no pathname) so http://localhost:8080 always resolves
 // the same way regardless of whether user opened index.html or just /
 function getRedirectUri() {
-  return window.location.origin + '/';
+  // During local dev with python3 -m http.server, the file is served at
+  // /index.html not / — use the actual current page URL so it always matches
+  // regardless of how the server resolves paths.
+  // Production (GitHub Pages): will be /ztna-simulator.html or /
+  const url = window.location.href.split('?')[0].split('#')[0];
+  // Remove trailing slash if present, then use as-is
+  return url.endsWith('/') ? url : url;
 }
 
 // ── OKTA INIT ─────────────────────────────────────────────────

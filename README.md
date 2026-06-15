@@ -109,14 +109,27 @@ Model: `mistralai/mistral-7b-instruct:free` (no cost on free tier)
 
 ## Running locally
 
+**Do NOT use `python3 -m http.server`** — it serves a directory listing at `/` instead of `index.html`, breaking the Okta redirect callback.
+
+Use one of these instead:
+
 ```bash
 git clone https://github.com/IshwaryaLakshmiC/ztna-simulator
 cd ztna-simulator
-python3 -m http.server 8080
-# open http://localhost:8080
+
+# Option A — Python (no install needed)
+python3 serve.py
+
+# Option B — Node.js (no install needed)
+node server.js
+
+# Option C — npx
+npx serve . -l 8080 -s
 ```
 
-For Okta to work locally, add `http://localhost:8080` as a redirect URI in your Okta app settings.
+Then open **http://localhost:8080/**
+
+The Okta redirect URI to whitelist in your app settings: **`http://localhost:8080/`** (with trailing slash)
 
 ---
 
