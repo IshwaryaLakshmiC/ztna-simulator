@@ -629,49 +629,46 @@ function initOkta() {
   localStorage.setItem('okta_domain',    domain);
   localStorage.setItem('okta_client_id', clientId);
 
-  setupOktaAuth(domain, clientId);
+  // Build the OktaAuth instance then immediately trigger sign-in
+  setupOktaAuth(domain, clientId, /* triggerSignIn= */ true);
 }
 
-function setupOktaAuth(domain, clientId) {
-  // Use localStorage not sessionStorage — survives the Okta redirect
-  // (sessionStorage is tab-scoped but cleared on navigation in some browsers)
+function setupOktaAuth(domain, clientId, triggerSignIn = false) {
   oktaAuth = new OktaAuth({
     issuer:      `https://${domain}/oauth2/default`,
     clientId:    clientId,
     redirectUri: getRedirectUri(),
     scopes:      ['openid', 'profile', 'email'],
-    // NOTE: 'groups' is NOT a standard OIDC scope — groups come from a
-    // custom ID token claim configured in Okta Authorization Server.
-    // Requesting 'groups' as a scope here does nothing and may cause errors.
-    // Groups are returned in the ID token via the custom claim we configured.
-    pkce: true,
+    pkce:        true,
     tokenManager: {
-      storage:        'localStorage',  // survives full-page redirects
-      autoRenew:      true,
+      storage:            'localStorage',
+      autoRenew:          true,
       expireEarlySeconds: 30,
     },
-    // Disable automatic redirect on expiry — we handle it manually
     restoreOriginalUri: async (_oktaAuth, originalUri) => {
       window.location.replace(originalUri || getRedirectUri());
     }
   });
 
-  // ── Critical: check for callback BEFORE checking session ──
-  // Okta redirects back with ?code=... — this must be handled first.
-  // The previous code had a race: isAuthenticated() could resolve
-  // before handleRedirectCallback() ran, causing a re-redirect loop.
   if (oktaAuth.isLoginRedirect()) {
-    // We're in the callback — handle it, then load the user
+    // We're returning from Okta with ?code= — handle the callback
     handleOktaCallback();
   } else {
-    // Normal page load — check if already authenticated
     oktaAuth.isAuthenticated().then(isAuth => {
       if (isAuth) {
+        // Already have a valid session — load user immediately
         loadOktaUser();
+      } else if (triggerSignIn) {
+        // User explicitly clicked "Connect + Sign In" — redirect to Okta
+        oktaAuth.signInWithRedirect({ originalUri: getRedirectUri() });
       }
-      // Don't auto-redirect here — wait for user to click "Connect + Sign In"
+      // If !isAuth && !triggerSignIn: page loaded with saved config but no
+      // session — just show the config panel, don't auto-redirect
     }).catch(err => {
       console.error('isAuthenticated error:', err);
+      if (triggerSignIn) {
+        showOktaError(`Failed to check session: ${err.message}`);
+      }
     });
   }
 }
@@ -919,20 +916,6 @@ const POLICIES = [
 ];
 
 let state = { selectedResource:'internal_app', policies:Object.fromEntries(POLICIES.map(p=>[p.id,p.default])), orKey:'' };
-
-// ── OKTA INIT ─────────────────────────────────────────────────
-function initOkta() {
-  const domain = document.getElementById('okta-domain').value.trim();
-  const clientId = document.getElementById('okta-client-id').value.trim();
-  if (!domain || !clientId) { alert('Please enter both Okta domain and Client ID'); return; }
-
-  OKTA_DOMAIN = domain;
-  OKTA_CLIENT_ID = clientId;
-  localStorage.setItem('okta_domain', domain);
-  localStorage.setItem('okta_client_id', clientId);
-
-  setupOktaAuth(domain, clientId);
-}
 
 // ── RENDER ────────────────────────────────────────────────────
 function init() {
