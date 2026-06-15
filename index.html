@@ -7,8 +7,23 @@
   <meta name="description" content="Interactive ZTNA policy simulator with real Okta SSO integration. Live identity, device posture, and resource policy evaluation." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <!-- Okta Auth JS SDK -->
-  <script src="https://global.oktacdn.com/okta-auth-js/7.5.1/okta-auth-js.min.js"></script>
+  <!-- Okta Auth JS SDK — primary CDN -->
+  <script src="https://global.oktacdn.com/okta-auth-js/7.5.1/okta-auth-js.min.js"
+    onerror="loadOktaSDKFallback()"></script>
+  <script>
+  function loadOktaSDKFallback() {
+    console.warn('Primary Okta CDN failed, trying unpkg fallback...');
+    var s = document.createElement('script');
+    s.src = 'https://unpkg.com/@okta/okta-auth-js@7.5.1/build/umd/okta-auth-js.min.js';
+    s.onerror = function() {
+      document.getElementById('sdk-error').style.display = 'block';
+    };
+    document.head.appendChild(s);
+  }
+  </script>
+  <div id="sdk-error" style="display:none;position:fixed;top:0;left:0;right:0;background:#EF4444;color:#fff;padding:12px 20px;font-family:monospace;font-size:13px;z-index:9999">
+    ⚠ Okta SDK failed to load from CDN. Check your internet connection or disable browser extensions (ad blockers block okta CDN). Then hard-refresh (Cmd+Shift+R).
+  </div>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
@@ -626,55 +641,77 @@ function getRedirectUri() {
 
 // ── OKTA INIT ─────────────────────────────────────────────────
 function initOkta() {
+  // Guard: check SDK loaded
+  if (typeof OktaAuth === 'undefined') {
+    const msg = 'Okta SDK did not load. Possible causes:\n' +
+      '1. Ad blocker / browser extension blocking okta CDN\n' +
+      '2. No internet connection\n' +
+      '3. Corporate firewall blocking global.oktacdn.com\n\n' +
+      'Fix: disable extensions for localhost, then hard-refresh (Cmd+Shift+R / Ctrl+Shift+R)';
+    alert(msg);
+    console.error('OktaAuth is undefined — SDK not loaded');
+    return;
+  }
+
   const domain   = document.getElementById('okta-domain').value.trim();
   const clientId = document.getElementById('okta-client-id').value.trim();
-  if (!domain || !clientId) { alert('Enter both Okta domain and Client ID'); return; }
+
+  if (!domain || !clientId) {
+    alert('Enter both Okta Domain and Client ID');
+    return;
+  }
+
+  console.log('initOkta called:', { domain, clientId, redirectUri: getRedirectUri() });
 
   OKTA_DOMAIN    = domain;
   OKTA_CLIENT_ID = clientId;
   localStorage.setItem('okta_domain',    domain);
   localStorage.setItem('okta_client_id', clientId);
 
-  // Build the OktaAuth instance then immediately trigger sign-in
   setupOktaAuth(domain, clientId, /* triggerSignIn= */ true);
 }
 
 function setupOktaAuth(domain, clientId, triggerSignIn = false) {
-  oktaAuth = new OktaAuth({
-    issuer:      `https://${domain}/oauth2/default`,
-    clientId:    clientId,
-    redirectUri: getRedirectUri(),
-    scopes:      ['openid', 'profile', 'email'],
-    pkce:        true,
-    tokenManager: {
-      storage:            'localStorage',
-      autoRenew:          true,
-      expireEarlySeconds: 30,
-    },
-    restoreOriginalUri: async (_oktaAuth, originalUri) => {
-      window.location.replace(originalUri || getRedirectUri());
-    }
-  });
+  console.log('setupOktaAuth:', { domain, clientId, triggerSignIn, redirectUri: getRedirectUri() });
+
+  try {
+    oktaAuth = new OktaAuth({
+      issuer:      `https://${domain}/oauth2/default`,
+      clientId:    clientId,
+      redirectUri: getRedirectUri(),
+      scopes:      ['openid', 'profile', 'email'],
+      pkce:        true,
+      tokenManager: {
+        storage:            'localStorage',
+        autoRenew:          true,
+        expireEarlySeconds: 30,
+      },
+      restoreOriginalUri: async (_oktaAuth, originalUri) => {
+        window.location.replace(originalUri || getRedirectUri());
+      }
+    });
+    console.log('OktaAuth instance created OK');
+  } catch(err) {
+    console.error('Failed to create OktaAuth instance:', err);
+    showOktaError(`Failed to initialise Okta: ${err.message}`);
+    return;
+  }
 
   if (oktaAuth.isLoginRedirect()) {
-    // We're returning from Okta with ?code= — handle the callback
+    console.log('Okta callback detected — handling redirect...');
     handleOktaCallback();
   } else {
     oktaAuth.isAuthenticated().then(isAuth => {
+      console.log('isAuthenticated:', isAuth, '| triggerSignIn:', triggerSignIn);
       if (isAuth) {
-        // Already have a valid session — load user immediately
         loadOktaUser();
       } else if (triggerSignIn) {
-        // User explicitly clicked "Connect + Sign In" — redirect to Okta
+        console.log('Redirecting to Okta login...');
         oktaAuth.signInWithRedirect({ originalUri: getRedirectUri() });
       }
-      // If !isAuth && !triggerSignIn: page loaded with saved config but no
-      // session — just show the config panel, don't auto-redirect
     }).catch(err => {
       console.error('isAuthenticated error:', err);
-      if (triggerSignIn) {
-        showOktaError(`Failed to check session: ${err.message}`);
-      }
+      if (triggerSignIn) showOktaError(`Session check failed: ${err.message}`);
     });
   }
 }
