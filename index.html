@@ -280,6 +280,10 @@
       </div>
       <button class="btn btn-primary" onclick="initOkta()">Connect + Sign In</button>
     </div>
+    <div style="margin-top:10px;padding:8px 10px;background:rgba(59,130,246,0.05);border-radius:6px;border:1px solid rgba(59,130,246,0.12)">
+      <p style="font-family:var(--mono);font-size:10px;color:var(--slate-l);margin-bottom:3px">Add this exact URI to your Okta app → Sign-in redirect URIs:</p>
+      <p style="font-family:var(--mono);font-size:12px;color:#93C5FD;word-break:break-all" id="redirect-uri-display"></p>
+    </div>
     <div class="or-row"><div class="or-line"></div><span class="or-text">or use demo mode</span><div class="or-line"></div></div>
     <button class="btn btn-ghost" style="width:100%" onclick="enterDemoMode()">Continue without Okta — use simulated identities</button>
     <p class="okta-note">
@@ -600,12 +604,279 @@
 </footer>
 
 <script>
-// ── CONFIG (filled in by user or via URL params) ──────────────
-let OKTA_DOMAIN = localStorage.getItem('okta_domain') || '';
+// ── CONFIG ────────────────────────────────────────────────────
+let OKTA_DOMAIN    = localStorage.getItem('okta_domain')    || '';
 let OKTA_CLIENT_ID = localStorage.getItem('okta_client_id') || '';
 let oktaAuth = null;
 let oktaUser = null;
 let demoMode = false;
+
+// ── REDIRECT URI — must be exact, consistent, and match Okta app ──
+// Use origin only (no pathname) so http://localhost:8080 always resolves
+// the same way regardless of whether user opened index.html or just /
+function getRedirectUri() {
+  return window.location.origin + '/';
+}
+
+// ── OKTA INIT ─────────────────────────────────────────────────
+function initOkta() {
+  const domain   = document.getElementById('okta-domain').value.trim();
+  const clientId = document.getElementById('okta-client-id').value.trim();
+  if (!domain || !clientId) { alert('Enter both Okta domain and Client ID'); return; }
+
+  OKTA_DOMAIN    = domain;
+  OKTA_CLIENT_ID = clientId;
+  localStorage.setItem('okta_domain',    domain);
+  localStorage.setItem('okta_client_id', clientId);
+
+  setupOktaAuth(domain, clientId);
+}
+
+function setupOktaAuth(domain, clientId) {
+  // Use localStorage not sessionStorage — survives the Okta redirect
+  // (sessionStorage is tab-scoped but cleared on navigation in some browsers)
+  oktaAuth = new OktaAuth({
+    issuer:      `https://${domain}/oauth2/default`,
+    clientId:    clientId,
+    redirectUri: getRedirectUri(),
+    scopes:      ['openid', 'profile', 'email'],
+    // NOTE: 'groups' is NOT a standard OIDC scope — groups come from a
+    // custom ID token claim configured in Okta Authorization Server.
+    // Requesting 'groups' as a scope here does nothing and may cause errors.
+    // Groups are returned in the ID token via the custom claim we configured.
+    pkce: true,
+    tokenManager: {
+      storage:        'localStorage',  // survives full-page redirects
+      autoRenew:      true,
+      expireEarlySeconds: 30,
+    },
+    // Disable automatic redirect on expiry — we handle it manually
+    restoreOriginalUri: async (_oktaAuth, originalUri) => {
+      window.location.replace(originalUri || getRedirectUri());
+    }
+  });
+
+  // ── Critical: check for callback BEFORE checking session ──
+  // Okta redirects back with ?code=... — this must be handled first.
+  // The previous code had a race: isAuthenticated() could resolve
+  // before handleRedirectCallback() ran, causing a re-redirect loop.
+  if (oktaAuth.isLoginRedirect()) {
+    // We're in the callback — handle it, then load the user
+    handleOktaCallback();
+  } else {
+    // Normal page load — check if already authenticated
+    oktaAuth.isAuthenticated().then(isAuth => {
+      if (isAuth) {
+        loadOktaUser();
+      }
+      // Don't auto-redirect here — wait for user to click "Connect + Sign In"
+    }).catch(err => {
+      console.error('isAuthenticated error:', err);
+    });
+  }
+}
+
+async function handleOktaCallback() {
+  try {
+    // Parse the code from the URL and exchange it for tokens
+    await oktaAuth.handleRedirectCallback();
+    // Clean up the URL — remove ?code=&state= from browser history
+    window.history.replaceState({}, document.title, getRedirectUri());
+    await loadOktaUser();
+  } catch (err) {
+    console.error('Okta callback error:', err);
+    // Common causes:
+    // 1. redirectUri mismatch — URL in Okta app != getRedirectUri()
+    // 2. PKCE code_verifier lost — happens if sessionStorage was used
+    // 3. State mismatch — user opened two tabs during auth
+    const msg = err.message || String(err);
+    if (msg.includes('state')) {
+      showOktaError('State mismatch — you may have opened multiple tabs. Try again.');
+    } else if (msg.includes('redirect_uri')) {
+      showOktaError(`Redirect URI mismatch. Add this exact URI to your Okta app: ${getRedirectUri()}`);
+    } else {
+      showOktaError(`Callback failed: ${msg}. Check browser console for details.`);
+    }
+    // Clear bad tokens so the user can retry
+    await oktaAuth.tokenManager.clear();
+  }
+}
+
+function signInWithOkta() {
+  if (!oktaAuth) return;
+  // Store current path so we can restore after redirect (not needed here
+  // since we're SPA, but good practice)
+  oktaAuth.signInWithRedirect({
+    originalUri: getRedirectUri(),
+  });
+}
+
+function signOutOkta() {
+  if (!oktaAuth) return;
+  localStorage.removeItem('okta_domain');
+  localStorage.removeItem('okta_client_id');
+  oktaAuth.signOut({ postLogoutRedirectUri: getRedirectUri() });
+}
+
+async function loadOktaUser() {
+  try {
+    const tokens = await oktaAuth.tokenManager.getTokens();
+    const idToken = tokens.idToken;
+    if (!idToken) {
+      // Token missing — likely expired or cleared. Re-init the config panel.
+      console.warn('No ID token found after callback');
+      return;
+    }
+
+    const claims = idToken.claims;
+
+    // ── Groups extraction ──────────────────────────────────────
+    // groups claim is a CUSTOM claim configured in Okta Authorization Server
+    // under Security → API → Authorization Servers → default → Claims
+    // Name: "groups", Include in: ID Token, Value type: Groups, Filter: .*
+    // It will appear as claims.groups = ["engineers", "admins", "Everyone"]
+    // If this is undefined, the custom claim is not configured correctly.
+    const rawGroups = claims.groups || [];
+    const filteredGroups = rawGroups.filter(g =>
+      !['everyone', 'all users', 'all okta users'].includes(g.toLowerCase())
+    );
+
+    // ── AMR (Authentication Method Reference) ─────────────────
+    // amr tells us HOW the user authenticated — which MFA method they used.
+    // Values: 'pwd' (password), 'otp' (TOTP), 'hwk' (hardware key),
+    //         'sms' (SMS), 'kba' (security questions)
+    const amr = claims.amr || [];
+
+    oktaUser = {
+      name:   claims.name || claims.preferred_username || claims.email,
+      email:  claims.email,
+      sub:    claims.sub,
+      groups: filteredGroups,
+      amr:    amr,
+      // Store raw claims for debugging
+      _claims: claims,
+    };
+
+    showOktaIdentity();
+    applyOktaToForm();
+  } catch (err) {
+    console.error('loadOktaUser error:', err);
+    showOktaError(`Failed to load user profile: ${err.message}`);
+  }
+}
+
+function showOktaIdentity() {
+  document.getElementById('okta-setup-panel').style.display = 'none';
+  const panel = document.getElementById('okta-identity-panel');
+  panel.style.display = 'block';
+
+  const initials = (oktaUser.name || 'U').split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2);
+  const groups    = oktaUser.groups;
+  const amr       = oktaUser.amr;
+  const mfaMethod = amr.includes('hwk') ? 'hardware (FIDO2)'
+                  : amr.includes('otp') ? 'TOTP app'
+                  : amr.includes('sms') ? 'SMS'
+                  : 'password only';
+
+  // Debug: show if groups claim is missing
+  const groupsWarning = groups.length === 0
+    ? `<span style="color:#FCD34D;font-size:10px;font-family:var(--mono)">⚠ No groups — check Okta groups claim config</span>`
+    : groups.map(g=>`<span class="id-group-tag">${g}</span>`).join('');
+
+  panel.innerHTML = `
+    <div class="identity-badge">
+      <div class="id-avatar">${initials}</div>
+      <div class="id-info">
+        <div class="id-name">${oktaUser.name}</div>
+        <div class="id-email">${oktaUser.email}</div>
+        <div class="id-groups">
+          <span class="id-source">✓ Live Okta SSO</span>
+          ${groupsWarning}
+          <span class="id-group-tag" style="background:rgba(167,139,250,0.1);color:#C4B5FD;border-color:rgba(167,139,250,0.2)">MFA: ${mfaMethod}</span>
+        </div>
+      </div>
+      <div class="id-actions">
+        <button class="btn btn-ghost" onclick="debugOktaClaims()" style="font-size:11px;padding:5px 10px">Debug claims</button>
+        <button class="btn btn-ghost" onclick="signOutOkta()" style="font-size:12px;padding:6px 12px">Sign out</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('identity-source-badge').className = 'source-tag source-okta';
+  document.getElementById('identity-source-badge').textContent = '✓ live okta';
+  document.getElementById('nav-auth-area').innerHTML =
+    `<span style="font-family:var(--mono);font-size:11px;color:#6EE7B7">● ${oktaUser.email}</span>`;
+}
+
+function debugOktaClaims() {
+  // Shows raw ID token claims — useful for verifying groups claim is present
+  const claims = oktaUser?._claims || {};
+  const msg = Object.entries(claims)
+    .map(([k,v]) => `${k}: ${JSON.stringify(v)}`)
+    .join('\n');
+  alert(`ID Token Claims:\n\n${msg}\n\n` +
+    (claims.groups
+      ? `✓ groups claim present: ${JSON.stringify(claims.groups)}`
+      : `⚠ groups claim MISSING — configure it in:\nOkta Admin → Security → API → Authorization Servers → default → Claims → Add Claim\nName: groups | ID Token | Groups | Matches regex: .*`
+    )
+  );
+}
+
+function applyOktaToForm() {
+  if (!oktaUser) return;
+
+  // Map Okta group names → role selector values
+  const groups = oktaUser.groups.map(g => g.toLowerCase());
+  let role = 'readonly';
+  if      (groups.some(g => g.includes('admin')))                          role = 'admin';
+  else if (groups.some(g => g.includes('exec')))                           role = 'executive';
+  else if (groups.some(g => g.includes('engineer') || g.includes('dev'))) role = 'engineer';
+  else if (groups.some(g => g.includes('contractor') || g.includes('ext'))) role = 'contractor';
+  else if (groups.some(g => g.includes('finance')))                        role = 'finance';
+
+  // Map AMR authentication methods → MFA selector values
+  const amr = oktaUser.amr;
+  let mfa = 'none';
+  if      (amr.includes('hwk')) mfa = 'hardware';
+  else if (amr.includes('otp')) mfa = 'totp';
+  else if (amr.includes('sms')) mfa = 'sms';
+  // If only 'pwd' in amr — no MFA used
+
+  const userName = oktaUser.email?.split('@')[0] || oktaUser.name;
+  document.getElementById('attr-user').value = userName;
+  setSelect('attr-role', role);
+  setSelect('attr-mfa',  mfa);
+  setSelect('attr-auth', 'sso_okta');
+
+  // Visually lock fields sourced from Okta
+  ['attr-user','attr-role','attr-mfa','attr-auth'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.classList.add('okta-locked');
+      el.title = 'Sourced from live Okta IdP — read only';
+    }
+  });
+
+  updateRiskScore();
+}
+
+function enterDemoMode() {
+  demoMode = true;
+  document.getElementById('okta-setup-panel').style.display = 'none';
+  document.getElementById('nav-auth-area').innerHTML =
+    `<span style="font-family:var(--mono);font-size:11px;color:var(--slate)">demo mode</span>`;
+}
+
+function showOktaError(msg) {
+  const panel = document.getElementById('okta-setup-panel');
+  // Remove any existing error first
+  panel.querySelectorAll('.okta-error').forEach(e => e.remove());
+  const el = document.createElement('p');
+  el.className = 'okta-error';
+  el.style.cssText = 'color:#FCA5A5;font-size:12px;margin-top:10px;padding:8px 10px;background:rgba(239,68,68,0.08);border-radius:6px;border:1px solid rgba(239,68,68,0.2);line-height:1.5';
+  el.textContent = '⚠ ' + msg;
+  panel.appendChild(el);
+}
 
 const RESOURCES = [
   { id:'internal_app', icon:'🌐', name:'Internal App', sensitivity:'medium', label:'HIGH', cls:'sens-high' },
@@ -663,144 +934,6 @@ function initOkta() {
   setupOktaAuth(domain, clientId);
 }
 
-function setupOktaAuth(domain, clientId) {
-  oktaAuth = new OktaAuth({
-    issuer: `https://${domain}/oauth2/default`,
-    clientId: clientId,
-    redirectUri: window.location.origin + window.location.pathname,
-    scopes: ['openid', 'profile', 'email', 'groups'],
-    pkce: true,
-    tokenManager: { storage: 'sessionStorage' }
-  });
-
-  // Handle redirect callback
-  if (window.location.search.includes('code=')) {
-    oktaAuth.handleRedirectCallback().then(() => {
-      window.history.replaceState({}, '', window.location.pathname);
-      loadOktaUser();
-    }).catch(err => {
-      console.error('Okta callback error:', err);
-      showOktaError(err.message);
-    });
-  } else {
-    oktaAuth.isAuthenticated().then(isAuth => {
-      if (isAuth) loadOktaUser();
-      else signInWithOkta();
-    });
-  }
-}
-
-function signInWithOkta() {
-  if (!oktaAuth) return;
-  oktaAuth.signInWithRedirect({ prompt: 'login' });
-}
-
-function signOutOkta() {
-  if (!oktaAuth) return;
-  localStorage.removeItem('okta_domain');
-  localStorage.removeItem('okta_client_id');
-  oktaAuth.signOut().then(() => location.reload());
-}
-
-async function loadOktaUser() {
-  try {
-    const tokens = await oktaAuth.tokenManager.getTokens();
-    const idToken = tokens.idToken;
-    if (!idToken) { signInWithOkta(); return; }
-
-    const claims = idToken.claims;
-    oktaUser = {
-      name: claims.name || claims.preferred_username || claims.email,
-      email: claims.email,
-      groups: claims.groups || [],
-      sub: claims.sub,
-      amr: claims.amr || [],
-    };
-
-    showOktaIdentity();
-    applyOktaToForm();
-  } catch(err) {
-    console.error('Token error:', err);
-    signInWithOkta();
-  }
-}
-
-function showOktaIdentity() {
-  document.getElementById('okta-setup-panel').style.display = 'none';
-  const panel = document.getElementById('okta-identity-panel');
-  panel.style.display = 'block';
-
-  const initials = (oktaUser.name || 'U').split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2);
-  const groups = oktaUser.groups.filter(g => !['Everyone','All Users'].includes(g));
-  const mfaMethod = oktaUser.amr.includes('hwk') ? 'hardware' : oktaUser.amr.includes('otp') ? 'totp' : oktaUser.amr.includes('sms') ? 'sms' : 'totp';
-
-  panel.innerHTML = `
-    <div class="identity-badge">
-      <div class="id-avatar">${initials}</div>
-      <div class="id-info">
-        <div class="id-name">${oktaUser.name}</div>
-        <div class="id-email">${oktaUser.email}</div>
-        <div class="id-groups">
-          <span class="id-source">✓ Live Okta SSO</span>
-          ${groups.map(g=>`<span class="id-group-tag">${g}</span>`).join('')}
-          <span class="id-group-tag">MFA: ${mfaMethod}</span>
-        </div>
-      </div>
-      <div class="id-actions">
-        <button class="btn btn-ghost" onclick="signOutOkta()" style="font-size:12px;padding:6px 12px">Sign out</button>
-      </div>
-    </div>
-  `;
-
-  document.getElementById('identity-source-badge').className = 'source-tag source-okta';
-  document.getElementById('identity-source-badge').textContent = '✓ live okta';
-  document.getElementById('nav-auth-area').innerHTML = `<span style="font-family:var(--mono);font-size:11px;color:#6EE7B7">● ${oktaUser.email}</span>`;
-}
-
-function applyOktaToForm() {
-  if (!oktaUser) return;
-
-  // Map Okta groups to roles
-  const groups = oktaUser.groups.map(g=>g.toLowerCase());
-  let role = 'readonly';
-  if (groups.some(g=>g.includes('admin'))) role = 'admin';
-  else if (groups.some(g=>g.includes('exec'))) role = 'executive';
-  else if (groups.some(g=>g.includes('engineer')||g.includes('dev'))) role = 'engineer';
-  else if (groups.some(g=>g.includes('contractor')||g.includes('ext'))) role = 'contractor';
-  else if (groups.some(g=>g.includes('finance'))) role = 'finance';
-
-  // Map AMR to MFA method
-  const amr = oktaUser.amr || [];
-  let mfa = 'totp';
-  if (amr.includes('hwk')) mfa = 'hardware';
-  else if (amr.includes('sms')) mfa = 'sms';
-  else if (!amr.includes('otp') && !amr.includes('hwk')) mfa = 'none';
-
-  const userName = oktaUser.email?.split('@')[0] || oktaUser.name;
-  document.getElementById('attr-user').value = userName;
-  setSelect('attr-role', role);
-  setSelect('attr-mfa', mfa);
-  setSelect('attr-auth', 'sso_okta');
-
-  // Lock Okta-sourced fields visually
-  ['attr-user','attr-role','attr-mfa','attr-auth'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) { el.classList.add('okta-locked'); el.title = 'Sourced from Okta IdP'; }
-  });
-
-  updateRiskScore();
-}
-
-function enterDemoMode() {
-  demoMode = true;
-  document.getElementById('okta-setup-panel').style.display = 'none';
-  document.getElementById('nav-auth-area').innerHTML = `<span style="font-family:var(--mono);font-size:11px;color:var(--slate)">demo mode</span>`;
-}
-
-function showOktaError(msg) {
-  document.getElementById('okta-setup-panel').innerHTML += `<p style="color:#FCA5A5;font-size:12px;margin-top:8px">⚠ ${msg}</p>`;
-}
-
 // ── RENDER ────────────────────────────────────────────────────
 function init() {
   renderScenarios();
@@ -809,13 +942,37 @@ function init() {
   updateRiskScore();
   attachListeners();
 
+  // Show the exact redirect URI this page will use — must match Okta app config
+  const uriEl = document.getElementById('redirect-uri-display');
+  if (uriEl) uriEl.textContent = getRedirectUri();
+
   const orSaved = sessionStorage.getItem('or_key');
   if (orSaved) { document.getElementById('or-key').value = orSaved; state.orKey = orSaved; }
 
-  // Auto-init if saved Okta config
-  if (OKTA_DOMAIN && OKTA_CLIENT_ID) {
-    document.getElementById('okta-domain').value = OKTA_DOMAIN;
-    document.getElementById('okta-client-id').value = OKTA_CLIENT_ID;
+  // Pre-fill saved config values into the form
+  if (OKTA_DOMAIN)    document.getElementById('okta-domain').value    = OKTA_DOMAIN;
+  if (OKTA_CLIENT_ID) document.getElementById('okta-client-id').value = OKTA_CLIENT_ID;
+
+  // Auto-init Okta on page load if:
+  // a) We have saved config (returning user), OR
+  // b) There's a ?code= in the URL (we're mid-callback from ANY previous config)
+  //
+  // Critical: the callback case must be handled even before the user
+  // enters their config again — the code is in the URL NOW.
+  const hasCallback = window.location.search.includes('code=');
+  const hasConfig   = OKTA_DOMAIN && OKTA_CLIENT_ID;
+
+  if (hasConfig || hasCallback) {
+    // If we're mid-callback but somehow lost the config, we can't proceed.
+    // This shouldn't happen since we use localStorage, but guard for it.
+    if (hasCallback && !hasConfig) {
+      showOktaError(
+        'Callback received but Okta config not found. ' +
+        'This can happen if you cleared localStorage. ' +
+        'Please enter your domain and Client ID again and try signing in.'
+      );
+      return;
+    }
     setupOktaAuth(OKTA_DOMAIN, OKTA_CLIENT_ID);
   }
 }
