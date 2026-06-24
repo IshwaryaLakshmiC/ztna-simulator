@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Zero Trust Access Simulator — ishwaryaaunfiltered.live</title>
-  <meta name="description" content="Interactive ZTNA policy simulator with real Okta SSO integration. Live identity, device posture, and resource policy evaluation." />
+  <title>Identity & Access Decision Studio — ishwaryaaunfiltered.live</title>
+  <meta name="description" content="Interactive identity and access decision platform with real Okta SSO integration. Evaluate policy impact, access risk, compliance alignment, and rollout decisions before production enforcement." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <!-- Okta Auth JS SDK — primary CDN -->
@@ -38,6 +38,7 @@
     /* NAV */
     nav { display:flex; align-items:center; justify-content:space-between; padding:1rem 2rem; border-bottom:1px solid rgba(59,130,246,0.1); flex-wrap:wrap; gap:10px; }
     .nav-brand { font-family:var(--mono); font-size:13px; color:var(--blue); font-weight:600; text-decoration:none; }
+    .nav-product-name { font-size:13px; color:var(--white); font-weight:500; margin-left:14px; padding-left:14px; border-left:1px solid rgba(59,130,246,0.15); }
     .nav-right { display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
     .nav-links { display:flex; gap:12px; }
     .nav-links a { font-size:12px; color:var(--slate); text-decoration:none; transition:color 0.2s; }
@@ -265,10 +266,11 @@
 
 <nav>
   <a href="https://ishwaryaaunfiltered.live" class="nav-brand">ishwarya@unfiltered:~$</a>
+  <span class="nav-product-name">Identity &amp; Access Decision Studio</span>
   <div class="nav-right">
     <div class="nav-links">
       <a href="https://ishwaryaaunfiltered.live">Portfolio</a>
-      <a href="https://github.com/IshwaryaLakshmiC/ztna-simulator" target="_blank">GitHub</a>
+      <a href="https://github.com/IshwaryaLakshmiC/identity-access-decision-studio" target="_blank">GitHub</a>
     </div>
     <div id="nav-auth-area"></div>
   </div>
@@ -306,7 +308,7 @@
     <button class="btn btn-ghost" style="width:100%" onclick="enterDemoMode()">Continue without Okta — use simulated identities</button>
     <p class="okta-note">
       Free Okta dev account at <a href="https://developer.okta.com" target="_blank">developer.okta.com</a> ·
-      See <a href="https://github.com/IshwaryaLakshmiC/ztna-simulator#setup" target="_blank">setup guide</a> for configuration steps
+      See <a href="https://github.com/IshwaryaLakshmiC/identity-access-decision-studio#setup" target="_blank">setup guide</a> for configuration steps
     </p>
   </div>
   <div id="okta-identity-panel" style="display:none"></div>
@@ -483,11 +485,11 @@
 
     </div><!-- end tab-access -->
 
-    <!-- TAB: Policy Impact Simulator -->
+    <!-- TAB: Policy Impact Analysis -->
     <div id="tab-impact" class="tab-panel">
       <div class="panel">
         <div class="panel-header">
-          <span class="panel-title">// Policy Impact Simulator</span>
+          <span class="panel-title">// Policy Impact Analysis</span>
           <span style="font-size:11px;color:var(--slate)">before you enable a policy</span>
         </div>
         <div class="panel-body">
@@ -607,8 +609,8 @@
   </div><!-- end right-col -->
 
 <footer>
-  Zero Trust Access Simulator · <a href="https://ishwaryaaunfiltered.live">ishwaryaaunfiltered.live</a> ·
-  <a href="https://github.com/IshwaryaLakshmiC/ztna-simulator" target="_blank">GitHub</a> ·
+  Identity &amp; Access Decision Studio · <a href="https://ishwaryaaunfiltered.live">ishwaryaaunfiltered.live</a> ·
+  <a href="https://github.com/IshwaryaLakshmiC/identity-access-decision-studio" target="_blank">GitHub</a> ·
   Built by <a href="https://linkedin.com/in/ishwaryachengalvarayan">Ishwarya Lakshmi C</a>
 </footer>
 
@@ -627,7 +629,7 @@ function getRedirectUri() {
   // During local dev with python3 -m http.server, the file is served at
   // /index.html not / — use the actual current page URL so it always matches
   // regardless of how the server resolves paths.
-  // Production (GitHub Pages): will be /ztna-simulator.html or /
+  // Production (GitHub Pages): will be /identity-access-decision-studio.html or /
   const url = window.location.href.split('?')[0].split('#')[0];
   // Remove trailing slash if present, then use as-is
   return url.endsWith('/') ? url : url;
@@ -1325,9 +1327,9 @@ Explain WHY and what should happen next. Be direct, no preamble.`;
 
   // Routes through the same EC2 backend used by the other portfolio projects --
   // Bedrock -> Groq -> Gemini -> OpenRouter fallback chain, no client-side key needed.
-  // /ztna-explain is an Nginx alias to the governance-copilot service (port 8000),
+  // /access-explain is an Nginx alias to the governance-copilot service (port 8000),
   // which hosts the shared /api/explain endpoint.
-  const explainApiBase = localStorage.getItem('ztna_explain_api_url') || (window.location.origin + '/ztna-explain');
+  const explainApiBase = localStorage.getItem('access_explain_api_url') || (window.location.origin + '/access-explain');
 
   try {
     const res = await fetch(`${explainApiBase}/api/explain`, {

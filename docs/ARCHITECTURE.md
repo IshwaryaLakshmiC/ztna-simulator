@@ -1,4 +1,4 @@
-# Architecture — Zero Trust Access Simulator
+# Architecture — Identity & Access Decision Studio
 
 ## System Overview
 
@@ -26,12 +26,12 @@
                 │               │               │
                 ▼               ▼               ▼
     ┌───────────────┐  ┌────────────┐  ┌──────────────────┐
-    │  JavaScript   │  │  Okta OIDC │  │  OpenRouter API  │
-    │  Policy Engine│  │  (live IdP)│  │  Mistral 7B      │
-    │               │  │            │  │  (free tier)     │
-    │  7 policies   │  │  Real user │  │                  │
-    │  evaluated    │  │  Real MFA  │  │  Plain-English   │
-    │  in order     │  │  Real groups│  │  explanation     │
+    │  JavaScript   │  │  Okta OIDC │  │  Shared backend  │
+    │  Policy Engine│  │  (live IdP)│  │  /api/explain    │
+    │               │  │            │  │                  │
+    │  7 policies   │  │  Real user │  │  Bedrock → Groq  │
+    │  evaluated    │  │  Real MFA  │  │  → Gemini →      │
+    │  in order     │  │  Real groups│  │  OpenRouter      │
     └───────────────┘  └────────────┘  └──────────────────┘
 ```
 
@@ -61,11 +61,12 @@ Access Request
         └───────────┴───────────┘
                     │
                     ▼
-         ┌──────────────────┐
-         │  OpenRouter LLM  │
-         │  AI Explanation  │
-         │  (if key set)    │
-         └──────────────────┘
+         ┌──────────────────────┐
+         │  Shared LLM backend  │
+         │  AI Explanation      │
+         │  (always available — │
+         │  no client key needed)│
+         └──────────────────────┘
 ```
 
 ## Okta OIDC Integration Flow
@@ -126,7 +127,7 @@ Score 71-100 → HIGH     (red)
 ## Vendor Mapping
 
 ```
-This simulator models the policy logic of:
+This platform models the policy logic of:
 
 Cloudflare Access ──── Resource + identity + device policies
 Okta Adaptive MFA ──── Risk-based step-up authentication
@@ -135,10 +136,15 @@ Zscaler ZPA ─────────── Application segmentation
 CrowdStrike Falcon ──── Endpoint device trust signals
 ```
 
+The decision model itself — signal collection, deterministic policy
+evaluation, risk scoring, impact simulation — is vendor-agnostic. The
+vendor mapping above shows which real products this logic corresponds
+to, not a dependency on any one of them.
+
 ## File Structure
 
 ```
-ztna-simulator/
+identity-access-decision-studio/
 ├── index.html          # Complete SPA — policy engine + Okta SDK + UI
 ├── docs/
 │   └── ARCHITECTURE.md # This file

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Local dev server for ZTNA Simulator.
+Local dev server for the Identity & Access Decision Studio.
 Serves index.html for ALL routes so Okta redirect callback works.
 
 Usage: python3 serve.py
@@ -36,7 +36,7 @@ class SPAHandler(http.server.BaseHTTPRequestHandler):
 
 if __name__ == '__main__':
     server = http.server.HTTPServer(('', PORT), SPAHandler)
-    print(f'\n  ZTNA Simulator running at http://localhost:{PORT}/')
+    print(f'\n  Identity & Access Decision Studio running at http://localhost:{PORT}/')
     print(f'  Okta redirect URI to whitelist: http://localhost:{PORT}/')
     print('\n  Ctrl+C to stop\n')
     try:

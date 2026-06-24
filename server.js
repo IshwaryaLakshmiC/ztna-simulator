@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Local dev server for ZTNA Simulator
+ * Local dev server for the Identity & Access Decision Studio
  * Serves index.html for all GET requests (SPA mode)
  * Usage: node server.js
  */
@@ -34,7 +34,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`\n  ZTNA Simulator running at http://localhost:${PORT}/`);
+  console.log(`\n  Identity & Access Decision Studio running at http://localhost:${PORT}/`);
   console.log(`  Okta redirect URI to whitelist: http://localhost:${PORT}/\n`);
   console.log('  Ctrl+C to stop\n');
 });
