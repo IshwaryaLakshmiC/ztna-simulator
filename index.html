@@ -256,12 +256,6 @@
     .rem-text strong { color:var(--white); font-weight:500; }
 
     /* OR API KEY */
-    .or-key-strip { max-width:1200px; margin:0 auto; padding:0 2rem 1rem; }
-    .or-key-inner { background:var(--card); border:1px solid rgba(59,130,246,0.08); border-radius:var(--r); padding:10px 16px; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-    .or-key-label { font-size:12px; color:var(--slate); }
-    .or-key-input { flex:1; min-width:200px; background:var(--surface); border:1px solid rgba(59,130,246,0.15); border-radius:6px; padding:6px 10px; font-size:12px; font-family:var(--mono); color:var(--white); outline:none; }
-    .or-key-input:focus { border-color:var(--blue); }
-    .or-key-note { font-size:11px; color:var(--slate); width:100%; }
 
     footer { text-align:center; padding:2rem; font-family:var(--mono); font-size:11px; color:var(--slate); border-top:1px solid rgba(59,130,246,0.08); margin-top:2rem; }
     footer a { color:var(--blue); text-decoration:none; }
@@ -316,15 +310,6 @@
     </p>
   </div>
   <div id="okta-identity-panel" style="display:none"></div>
-</div>
-
-<!-- OpenRouter key -->
-<div class="or-key-strip">
-  <div class="or-key-inner">
-    <span class="or-key-label">OpenRouter key (enables AI explanations):</span>
-    <input class="or-key-input" id="or-key" type="password" placeholder="sk-or-v1-..." oninput="saveOrKey()" />
-    <span class="or-key-note">Free at openrouter.ai · Stored in session only · Without key, policy engine still runs fully</span>
-  </div>
 </div>
 
 <div class="page">
@@ -991,7 +976,7 @@ const POLICIES = [
   { id:'weak_mfa_critical', label:'SMS MFA insufficient for critical', desc:'SMS-only MFA denied on CRITICAL resources', default:true },
 ];
 
-let state = { selectedResource:'internal_app', policies:Object.fromEntries(POLICIES.map(p=>[p.id,p.default])), orKey:'' };
+let state = { selectedResource:'internal_app', policies:Object.fromEntries(POLICIES.map(p=>[p.id,p.default])) };
 
 // ── RENDER ────────────────────────────────────────────────────
 function init() {
@@ -1004,9 +989,6 @@ function init() {
   // Show the exact redirect URI this page will use — must match Okta app config
   const uriEl = document.getElementById('redirect-uri-display');
   if (uriEl) uriEl.textContent = getRedirectUri();
-
-  const orSaved = sessionStorage.getItem('or_key');
-  if (orSaved) { document.getElementById('or-key').value = orSaved; state.orKey = orSaved; }
 
   // Pre-fill saved config values into the form
   if (OKTA_DOMAIN)    document.getElementById('okta-domain').value    = OKTA_DOMAIN;
@@ -1039,11 +1021,6 @@ function init() {
     }
     setupOktaAuth(OKTA_DOMAIN, OKTA_CLIENT_ID);
   }
-}
-
-function saveOrKey() {
-  state.orKey = document.getElementById('or-key').value;
-  sessionStorage.setItem('or_key', state.orKey);
 }
 
 function renderScenarios() {
@@ -1267,7 +1244,7 @@ function evaluate() {
   }
 
   renderDecision(verdict, trace, denyReasons, stepupReasons, ctx, resource);
-  if(state.orKey) fetchAIExplanation(verdict, denyReasons, stepupReasons, ctx, resource);
+  fetchAIExplanation(verdict, denyReasons, stepupReasons, ctx, resource);
 }
 
 function renderDecision(verdict, trace, denyReasons, stepupReasons, ctx, resource) {
@@ -1319,11 +1296,9 @@ function renderDecision(verdict, trace, denyReasons, stepupReasons, ctx, resourc
       <div class="ai-box">
         <div class="ai-header">
           <span class="ai-label">AI Explanation</span>
-          <div class="ai-spinner" id="ai-spinner"></div>
+          <div class="ai-spinner active" id="ai-spinner"></div>
         </div>
-        <div class="ai-text" id="ai-text">
-          ${state.orKey?'Generating explanation…':'Add OpenRouter API key above to enable plain-English explanations.'}
-        </div>
+        <div class="ai-text" id="ai-text">Generating explanation…</div>
       </div>
     </div>`;
   panel.scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -1348,16 +1323,24 @@ ${reasons.length?'Reasons: '+reasons.join(', '):''}
 
 Explain WHY and what should happen next. Be direct, no preamble.`;
 
+  // Routes through the same EC2 backend used by the other portfolio projects --
+  // Bedrock -> Groq -> Gemini -> OpenRouter fallback chain, no client-side key needed.
+  // /ztna-explain is an Nginx alias to the governance-copilot service (port 8000),
+  // which hosts the shared /api/explain endpoint.
+  const explainApiBase = localStorage.getItem('ztna_explain_api_url') || (window.location.origin + '/ztna-explain');
+
   try {
-    const res=await fetch('https://openrouter.ai/api/v1/chat/completions',{
-      method:'POST',
-      headers:{'Authorization':`Bearer ${state.orKey}`,'Content-Type':'application/json','HTTP-Referer':'https://ishwaryaaunfiltered.live','X-Title':'ZTNA Simulator'},
-      body:JSON.stringify({model:'mistralai/mistral-7b-instruct:free',max_tokens:150,temperature:0.3,messages:[{role:'user',content:prompt}]})
+    const res = await fetch(`${explainApiBase}/api/explain`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ prompt })
     });
-    const data=await res.json();
-    aiText.textContent=data.choices?.[0]?.message?.content||'Unable to generate explanation.';
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    aiText.textContent = data.explanation || 'Unable to generate explanation.';
   } catch(e) {
-    aiText.textContent='AI explanation unavailable — check OpenRouter key.';
+    console.warn('AI explanation error:', e);
+    aiText.textContent = 'AI explanation temporarily unavailable — the policy decision above is unaffected.';
   } finally {
     spinner.classList.remove('active');
   }
